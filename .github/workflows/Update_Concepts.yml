@@ -1,0 +1,77 @@
+name: Update Concepts Daily
+
+on:
+  schedule:
+    # 北京时间 17:30 (UTC 09:30)
+    - cron: '30 11 * * *'
+  workflow_dispatch: 
+  repository_dispatch:
+    types: [concepts_update_trigger]
+
+jobs:
+  run-update-concepts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        # 【关键补丁】pywencai 必须依赖 Node.js 环境解析 JS 算法
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Cache Python Packages
+        id: cache-packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.local/lib/python3.10/site-packages
+          key: ${{ runner.os }}-concepts-v1-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-concepts-v1-
+
+      - name: Install dependencies
+        if: steps.cache-packages.outputs.cache-hit != 'true'
+        run: |
+          python -m pip install --upgrade pip
+          # 确保包含 pandas, pywencai, requests
+          pip install --user pandas pywencai requests 
+
+      - name: Run Update Script
+        env:
+          TZ: 'Asia/Shanghai'
+          # 确保 Python 能找到安装在 --user 目录下的包
+          PYTHONPATH: ${{ github.workspace }}:/home/runner/.local/lib/python3.10/site-packages
+        # 执行你指定的路径脚本
+        run: python metadata/update_concepts_daily.py
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          # 根据你的 config.py，需要提交 data 目录下的新数据和 metadata 下的汇总表
+          git add data/同花顺所属概念更新/ metadata/所属概念.csv
+          git commit -m "Auto-update concepts: $(date +'%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
+          git push
+
+          # --- 新增：发送钉钉通知步骤 ---
+      - name: DingTalk Notification
+        if: always() 
+        run: |
+          # 计算加签 (Sign) - pywencai 或其他工具可能需要，但最简单的机器人只需 Token 和关键词
+          # 这里假设你使用的是钉钉的关键词验证模式
+          MSG="【股票分析】概念数据更新任务完成\n- 任务状态: ${{ job.status }}\n- 更新时间: $(date +'%Y-%m-%d %H:%M:%S')\n- 运行详情: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          
+          curl "https://oapi.dingtalk.com/robot/send?access_token=${{ secrets.DINGTALK_TOKEN }}" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"msgtype\": \"text\",
+              \"text\": {
+                \"content\": \"$MSG\"
+              }
+            }"
