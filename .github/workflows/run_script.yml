@@ -48,8 +48,4 @@ jobs:
 
       - name: Commit and push changes
         run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add data/raw/ 代码.csv
-          git commit -m "Auto-update stock data: $(date +'%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
-          git push
+        
