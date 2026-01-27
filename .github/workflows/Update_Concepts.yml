@@ -59,19 +59,4 @@ jobs:
           git commit -m "Auto-update concepts: $(date +'%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
           git push
 
-          # --- 新增：发送钉钉通知步骤 ---
-      - name: DingTalk Notification
-        if: always() 
-        run: |
-          # 计算加签 (Sign) - pywencai 或其他工具可能需要，但最简单的机器人只需 Token 和关键词
-          # 这里假设你使用的是钉钉的关键词验证模式
-          MSG="【股票分析】概念数据更新任务完成\n- 任务状态: ${{ job.status }}\n- 更新时间: $(date +'%Y-%m-%d %H:%M:%S')\n- 运行详情: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           
-          curl "https://oapi.dingtalk.com/robot/send?access_token=${{ secrets.DINGTALK_TOKEN }}" \
-            -H 'Content-Type: application/json' \
-            -d "{
-              \"msgtype\": \"text\",
-              \"text\": {
-                \"content\": \"$MSG\"
-              }
-            }"
