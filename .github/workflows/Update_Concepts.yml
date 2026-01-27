@@ -51,6 +51,7 @@ jobs:
         run: python metadata/update_concepts_daily.py
 
       - name: Commit and push changes
-        
+      
+        run: |
 
           
