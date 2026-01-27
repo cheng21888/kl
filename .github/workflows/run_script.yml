@@ -20,7 +20,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: '3.13'
 
       - name: Cache Python Packages
         id: cache-packages
@@ -41,11 +41,9 @@ jobs:
       - name: Run script
         env:
           TZ: 'Asia/Shanghai'
-          DINGTALK_TOKEN: ${{ secrets.DINGTALK_TOKEN }}
-          DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           # 确保 Python 能找到安装在 --user 目录下的包
-          PYTHONPATH: /home/runner/.local/lib/python3.10/site-packages
+          PYTHONPATH: /home/runner/.local/lib/python3.13/site-packages
         run: python main.py
 
       - name: Commit and push changes
