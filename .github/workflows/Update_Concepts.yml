@@ -24,13 +24,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: '3.13'
 
       - name: Cache Python Packages
         id: cache-packages
         uses: actions/cache@v3
         with:
-          path: ~/.local/lib/python3.10/site-packages
+          path: ~/.local/lib/python3.13/site-packages
           key: ${{ runner.os }}-concepts-v1-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-concepts-v1-
