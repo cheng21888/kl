@@ -159,8 +159,8 @@ def analyze_auction_flow(today_date: datetime, prev_date: datetime) -> Optional[
     # 注入题材数据
     df_concept = load_concept_data()
     if not df_concept.empty:
-        df['short_code'] = df['股票代码'].str.extract(r'(\d{6})')
-        df = df.merge(df_concept, left_on='short_code', right_on='code', how='left')
+        #df['short_code'] = df['股票代码'].str.extract(r'(\d{6})')
+        df = df.merge(df_concept, left_on='股票代码', right_on='code', how='left')
         df[['所属概念', '所属行业']] = df[['所属概念', '所属行业']].fillna('')
 
         def match_hot(row):

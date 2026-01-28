@@ -2,7 +2,7 @@ import pandas as pd
 from datetime import datetime,timedelta
 from typing import Optional, Tuple
 from .config import CALENDAR_PATH, DATA_DIR, CONCEPT_PATH
-from .utils import safe_read_csv, clean_dataframe
+from .utils import safe_read_csv, clean_dataframe,standardize_code
 
 # 1. 自动判断服务器时区并转换
 def get_beijing_now():
@@ -114,4 +114,5 @@ def load_concept_data() -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame()
     df['code'] = df['code'].astype(str).str.zfill(6)
+    df['code'] = df['code'].apply(standardize_code)
     return df[['code', '所属概念', '所属行业','历史涨停原因类别']].drop_duplicates()

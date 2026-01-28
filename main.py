@@ -262,17 +262,17 @@ if not df_real_c.empty:
             storage_msg += "\n⚠️ 存储空间超过400MB，请及时清理历史数据！"
             
         # 优化：不再保存 CLEAN_DIR 下的文件，以节约空间
-        msg = f"【股票分析】🚀 {curr_date} {suffix}数据已保存\n{stats_msg}\n{storage_msg}"
+        msg = f"【股票分析Github】🚀 {curr_date} {suffix}数据已保存\n{stats_msg}\n{storage_msg}"
         print(msg)
         send_dingtalk_msg(msg)
         print(f"⏰ 当前脚本执行时间 (北京): {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     else:
-        msg = f"【股票分析】ℹ️ 脚本运行完成，但当前时间不在保存时段内。"
+        msg = f"【股票分析Github】ℹ️ 脚本运行完成，但当前时间不在保存时段内。"
         print(msg)
         send_dingtalk_msg(msg)
         print(f"⏰ 当前脚本执行时间 (北京): {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 else:
-    msg = "【股票分析】⚠️ 未获取到行情数据，请检查网络或代码列表。"
+    msg = "【股票分析Github】⚠️ 未获取到行情数据，请检查网络或代码列表。"
     print(msg)
     send_dingtalk_msg(msg)
     print(f"⏰ 当前脚本执行时间 (北京): {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
