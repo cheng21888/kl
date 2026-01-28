@@ -26,7 +26,7 @@ jobs:
         id: cache-packages
         uses: actions/cache@v3
         with:
-          path: ~/.local/lib/python3.10/site-packages
+          path: ~/.local/lib/python3.13/site-packages
           # 增加 v2 后缀强制刷新缓存，解决之前的兼容性错误
           key: ${{ runner.os }}-site-packages-v2-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
