@@ -1,42 +1,61 @@
-# 配置文件名称：.github/workflows/stock_auto_run.yml
-name: 股票数据自动运行任务
+# 定义这个GitHub Actions任务的名称，在仓库的Actions页面会显示这个名称
+name: Stock Monitor Task # 任务名称：股票监控任务
+
+# 触发条件配置段：指定什么时候执行这个任务
 on:
-  # 手动触发：在GitHub仓库Actions页面可点击运行
-  workflow_dispatch:
-  # 定时任务：使用UTC时区，对应北京时间9:18和15:05
+  # 定时触发配置：基于cron表达式设定自动运行时间
   schedule:
-    # 竞价时间：UTC 01:18 → 北京时间 09:18
-    - cron: '18 1 * * 1-5'
-    # 收盘时间：UTC 07:05 → 北京时间 15:05
-    # 注意：cron格式为 分 时 日 月 周，周1-5对应股市交易日
-    - cron: '05 7 * * 1-5'
+    # 竞价时间触发：北京时间09:18（UTC时间01:18），仅周一到周五执行
+    - cron: '18 1 * * 1-5' # cron表达式：分 时 日 月 周，1-5代表周一至周五
+    # 收盘时间触发：北京时间15:05（UTC时间07:05），仅周一到周五执行
+    - cron: '05 7 * * 1-5' # 对应A股收盘后5分钟，用于更新收盘数据
+  # 手动触发配置：允许在GitHub页面手动点击"Run workflow"执行任务
+  workflow_dispatch: # 支持手动触发，紧急情况下可手动运行
+  
 
-# 任务执行配置
+# 任务执行体配置段：定义具体要运行的作业（jobs）
 jobs:
-  run-stock-script:
-    # 运行环境：选择最新的Ubuntu系统，兼容性好
-    runs-on: ubuntu-latest
-    # 任务步骤
+  # 定义一个名为run-script的作业（一个任务可包含多个作业，此处仅一个）
+  run-script: # 作业名称：运行脚本
+    # 指定作业运行的服务器环境：使用Ubuntu最新版的虚拟环境
+    runs-on: ubuntu-latest # 运行环境：GitHub提供的Ubuntu最新版虚拟机
+    # 作业的步骤序列：按顺序执行以下操作
     steps:
-      # 步骤1：拉取当前仓库的代码到运行环境
-      - name: 拉取仓库代码
-        uses: actions/checkout@v4
+      # 步骤1：拉取仓库代码到虚拟机
+      - name: Checkout code # 步骤名称：拉取代码
+        uses: actions/checkout@v3 # 使用GitHub官方的checkout动作，版本v3，作用是把仓库代码克隆到运行环境
 
-      # 步骤2：配置Python环境（匹配你的代码运行版本，建议3.9+）
-      - name: 配置Python环境
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'  # 可根据你的代码修改为3.9/3.11等
-          cache: 'pip'  # 缓存pip包，加快后续运行速度
+      # 步骤2：配置Python环境
+      - name: Set up Python # 步骤名称：配置Python
+        uses: actions/setup-python@v4 # 使用GitHub官方的Python环境配置动作，版本v4
+        with: # 为该动作指定参数
+          python-version: '3.13' # 指定使用Python 3.10版本，与项目开发环境保持一致
 
-      # 步骤3：安装依赖库（easyquotation、pywencai及其他依赖）
-      - name: 安装项目依赖
-        run: |
-          python -m pip install --upgrade pip
-          pip install easyquotation pywencai
-          # 若你的main.py还有其他依赖，在此添加，例如：
-          # pip install pandas numpy requests
+      # 步骤3：缓存Python依赖包，避免每次都重新安装，提升运行速度
+      - name: Cache Python Packages # 步骤名称：缓存Python包
+        id: cache-packages # 为该步骤设置唯一ID，后续可通过此ID引用步骤结果
+        uses: actions/cache@v3 # 使用GitHub官方的缓存动作，版本v3
+        with: # 缓存配置参数
+          path: ~/.local/lib/python3.13/site-packages # 缓存的路径：Python用户目录下的包安装路径
+          # 缓存的唯一键：由系统、包路径、requirements.txt哈希值组成，确保依赖变更时刷新缓存
+          key: ${{ runner.os }}-site-packages-v2-${{ hashFiles('**/requirements.txt') }} # 缓存键：系统+包目录+v2版本+依赖文件哈希
+          # 缓存回退规则：如果上述键不存在，尝试匹配前缀为"系统-site-packages-v2-"的缓存
+          restore-keys: | # 恢复缓存的备选键
+            ${{ runner.os }}-site-packages-v2-
 
-      # 步骤4：执行主代码main.py
-      - name: 运行股票主程序
-        run: python main.py
+      # 步骤4：安装Python依赖包，仅当缓存未命中时执行
+      - name: Install dependencies # 步骤名称：安装依赖
+        if: steps.cache-packages.outputs.cache-hit != 'true' # 条件判断：仅当缓存未命中（cache-hit为false）时执行
+        run: | # 执行一系列Linux命令
+          python -m pip install --upgrade pip # 升级pip工具到最新版本
+          pip install --user -r requirements.txt # 按requirements.txt安装依赖，--user表示安装到用户目录，避免权限问题
+
+      # 步骤5：运行核心的股票监控Python脚本
+      - name: Run script # 步骤名称：运行脚本
+        env: # 设置运行时的环境变量
+          TZ: 'Asia/Shanghai' # 设置系统时区为上海，解决时间戳时区偏移问题
+          PYTHONPATH: /home/runner/.local/lib/python3.10/site-packages # 指定Python包路径，确保能找到--user安装的依赖
+        run: python main.py # 执行核心脚本：运行项目的main.py文件
+
+      # 步骤6：将脚本运行产生的新数据提交并推回仓库
+      
