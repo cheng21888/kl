@@ -1,41 +1,70 @@
-# 工作流名称
-name: Auto Run Stock Script
-# 触发规则：工作日定时执行（竞价+收盘）
+# 修复：name 单独成行，增加说明
+name: Stock Monitor Task
+# 触发规则：定时+手动+外部API
 on:
   schedule:
-    # 北京时间 09:18 → UTC 01:18，周一到周五
+    # 北京时间 09:18 → UTC 01:18，工作日执行
     - cron: '18 1 * * 1-5'
-    # 北京时间 15:05 → UTC 07:05，周一到周五
+    # 北京时间 15:05 → UTC 07:05，工作日执行
     - cron: '05 7 * * 1-5'
-  workflow_dispatch:  # 保留手动触发，方便调试
+  workflow_dispatch:
+    description: "手动触发股票监控任务"  # 补充：手动触发说明
+  repository_dispatch:
+    types: [stock_monitor_trigger]  # 外部API触发的自定义事件
 
 jobs:
-  run-python-script:
-    runs-on: ubuntu-latest  # 运行环境：Ubuntu最新版
+  run-script:
+    runs-on: ubuntu-latest
+    # 可选：失败后通知，根据需求开启
+    # needs: [pre-check]
     steps:
-      # 步骤1：拉取仓库代码
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4  # 升级：使用最新版v4，兼容性更好
 
-      # 步骤2：配置系统时区（关键：确保Python时间为北京时间）
-      - name: Set Timezone to Asia/Shanghai
-        run: sudo timedatectl set-timezone Asia/Shanghai
+      - name: 配置系统时区（关键：解决Python时间时区问题）
+        run: |
+          sudo timedatectl set-timezone Asia/Shanghai
+          date  # 验证时区是否生效
 
-      # 步骤3：配置Python环境
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5  # 升级：最新版v5
         with:
-          python-version: '3.10'  # 推荐3.10+，兼容性好，可根据你的代码修改
-          cache: 'pip'  # 自动缓存依赖，加速下次运行
+          python-version: '3.13'
+          cache: 'pip'  # 优化：自动缓存pip依赖，无需手动配置缓存路径
 
-      # 步骤4：安装依赖（若有requirements.txt则执行，无则可删除此步骤）
-      - name: Install Dependencies
+      - name: 安装依赖（移除--user，避免路径问题）
         run: |
           python -m pip install --upgrade pip
-          if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
+          pip install -r requirements.txt
+        # 可选：依赖安装失败也继续（根据需求调整）
+        # continue-on-error: false
 
-      # 步骤5：运行主脚本main.py
-      - name: Run Main Script
+      - name: 运行主脚本
         env:
-          TZ: 'Asia/Shanghai'  # 双重保障Python时区
+          TZ: 'Asia/Shanghai'
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: python main.py
+        id: run_main  # 标记步骤ID，便于后续判断
+
+      - name: 提交并推送修改（补全核心命令，解决空步骤问题）
+        if: success()  # 仅当脚本运行成功时执行
+        run: |
+          # 配置Git用户信息（必须，否则无法提交）
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          # 拉取最新代码，避免冲突
+          git pull
+          # 添加所有修改的文件
+          git add .
+          # 提交（无修改时不报错）
+          git commit -m "Auto update: Stock monitor data $(date +'%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
+          # 推送（使用GitHub内置令牌）
+          git push origin ${{ github.ref }}
+        env:
+          # 授权：使用GitHub Actions内置令牌，无需手动配置秘钥
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 步骤失败通知（可选）
+        if: failure()
+        run: |
+          echo "股票监控任务执行失败，请查看日志！"
