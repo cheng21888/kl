@@ -52,6 +52,11 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
+          # 新增：拉取远程main分支最新内容，变基方式避免多余合并提交
+          git pull origin main --rebase --autostash
+          # 原有提交逻辑不变
           git add data/raw/ 代码.csv
           git commit -m "Auto-update stock data: $(date +'%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
-          git push
+          # 原有推送逻辑不变
+          git push origin main
+     
