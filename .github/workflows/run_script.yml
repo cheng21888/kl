@@ -50,13 +50,18 @@ jobs:
 
       - name: Commit and push changes
         run: |
+          # 第一步：配置git用户信息（原有）
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          # 新增：拉取远程main分支最新内容，变基方式避免多余合并提交
+
+          # 第二步：核心修复！先拉取远程最新代码（必须放在提交前）
           git pull origin main --rebase --autostash
-          # 原有提交逻辑不变
+
+          # 第三步：添加文件+提交（原有，顺序不变）
           git add data/raw/ 代码.csv
           git commit -m "Auto-update stock data: $(date +'%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
-          # 原有推送逻辑不变
+
+          # 第四步：推送（原有）
           git push origin main
+
      
