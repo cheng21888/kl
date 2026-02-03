@@ -2,12 +2,14 @@ name: Stock Monitor Task
 
 on:
   schedule:
-    # 竞价时间：北京时间 09:18 (提前启动等待) -> UTC 01:18
-    - cron: '18 1 * * 1-5'
-    # 收盘时间：北京时间 15:05 -> UTC 07:05
-    - cron: '05 7 * * 1-5'
+    # 竞价时间：北京时间 09:18 触发（周一至周五）
+    - cron: '18 09 * * 1-5'
+      timezone: Asia/Shanghai  # 关键：指定北京时间
+    # 收盘时间：北京时间 15:05 触发（周一至周五）
+    - cron: '05 15 * * 1-5'
+      timezone: Asia/Shanghai  # 关键：指定北京时间
   workflow_dispatch: # 支持手动触发
-  repository_dispatch: # <--- 核心修改：允许外部 API 触发
+  repository_dispatch: # 允许外部 API 触发
     types: [stock_monitor_trigger] # 自定义触发事件名称
 
 jobs:
@@ -50,18 +52,8 @@ jobs:
 
       - name: Commit and push changes
         run: |
-          # 第一步：配置git用户信息（原有）
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-
-          # 第二步：核心修复！先拉取远程最新代码（必须放在提交前）
-          git pull origin main --rebase --autostash
-
-          # 第三步：添加文件+提交（原有，顺序不变）
           git add data/raw/ 代码.csv
           git commit -m "Auto-update stock data: $(date +'%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
-
-          # 第四步：推送（原有）
-          git push origin main
-
-     
+          git push
