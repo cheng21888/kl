@@ -149,7 +149,7 @@ def is_save_time():
         
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).time()
     morning = datetime.time(9, 25) <= now <= datetime.time(9, 30)
-    afternoon = datetime.time(15, 0) <= now <= datetime.time(16, 0)
+    afternoon = datetime.time(15, 0) <= now <= datetime.time(18, 0)
     return morning or afternoon
 
 def clean_data(df, is_index=False):
