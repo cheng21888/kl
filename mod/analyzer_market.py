@@ -2,10 +2,9 @@
 import pandas as pd
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
-from modules.data_loader import read_market_data
+from mod.data_loader import read_market_data
 import streamlit as st
-from modules.config import DATA_DIR, SENTIMENT_TREND_PATH
-
+from mod.config import DATA_DIR, SENTIMENT_TREND_PATH
 
 def fast_daily_calc(df: pd.DataFrame, prefix: str):
     """
@@ -36,11 +35,11 @@ def fast_daily_calc(df: pd.DataFrame, prefix: str):
     # 构造常用布尔掩码
     mask_sh = np.char.startswith(codes, 'sh6')
     mask_cyb = np.char.startswith(codes, 'sz3')
-    # 1. 强化 ST 过滤：涵盖 ST, *ST, SST 以及可能的大小写
+# 1. 强化 ST 过滤：涵盖 ST, *ST, SST 以及可能的大小写
     # NumPy 向量化：先转小写，再查是否存在 'st'
     names_lower = np.char.lower(names)
     mask_not_st = (np.char.find(names_lower, 'st') == -1)
-
+    
     # 2. 极高精度涨跌停判定 (使用 0.001 避免浮点数漂移误差)
     # 增加 price > 0 判定，防止停牌股干扰
     # 1. 极高精度价格判定 (0.001)
@@ -50,16 +49,16 @@ def fast_daily_calc(df: pd.DataFrame, prefix: str):
 
     # 3. 情绪计数逻辑 (确保仅在 mask_not_st 范围内)
     m_valid = mask_not_st
-
+    
     # 涨停/跌停数统计
     count_limit_up = np.sum(is_limit_up & m_valid)
     count_limit_down = np.sum(is_limit_down & m_valid)
-
+    
     # 核心统计计算
     total_amt = np.sum(amts) / 1e8
     sh_amt = np.sum(amts[mask_sh]) / 1e8
     cyb_amt = np.sum(amts[mask_cyb]) / 1e8
-
+    
     # 计算前15股票成交额总额及其与市场总额的比例
     if len(amts) >= 15:
         # 获取前15大成交额
@@ -94,7 +93,6 @@ def fast_daily_calc(df: pd.DataFrame, prefix: str):
         '创跌': np.sum((chgs < 0) & m_cyb_valid)
     }
     return {f"{prefix}_{k}": v for k, v in raw_stats.items()}
-
 
 def process_index_data(d, prefix):
     """
@@ -139,7 +137,7 @@ def process_index_data(d, prefix):
         # 5. 建立查找表 (根据你上传的 CSV 列名是 'code' 和 '涨跌(%)')
         # 强制将 code 转为字符串并去空格
         df_raw['code'] = df_raw['code'].astype(str).str.strip().str.lower()
-
+        
         # 自动识别涨跌幅列名（兼容不同版本的CSV）
         pct_col = '涨跌(%)' if '涨跌(%)' in df_raw.columns else '涨跌幅'
         lookup = dict(zip(df_raw['code'], df_raw[pct_col]))
@@ -148,13 +146,12 @@ def process_index_data(d, prefix):
         res[f'{prefix}_上证涨跌幅'] = float(lookup.get('sh000001', 0.0))
         res[f'{prefix}_深证涨跌幅'] = float(lookup.get('sz399001', 0.0))
         res[f'{prefix}_创业涨跌幅'] = float(lookup.get('sz399006', 0.0))
-
+        
         return res
 
     except Exception as e:
         print(f"❌ [ERROR] 提取指数失败: {e}")
         return res
-
 
 def process_single_date(d):
     """单日处理单元"""
@@ -162,25 +159,22 @@ def process_single_date(d):
         df_jj = read_market_data(d, '竞价行情')
         df_sp = read_market_data(d, '收盘行情')
         if df_jj.empty and df_sp.empty: return None
-
+        
         res_jj = fast_daily_calc(df_jj, prefix="竞价")
         res_sp = fast_daily_calc(df_sp, prefix="收盘")
-
+        
         # 读取并处理指数数据
         index_jj = process_index_data(d, "竞价")
         index_sp = process_index_data(d, "收盘")
-
+        
         combined = {'日期': d.strftime('%Y-%m-%d'), '_raw_date': d}
         combined.update(res_jj)
         combined.update(res_sp)
         combined.update(index_jj)
         combined.update(index_sp)
         return combined
-    except Exception:
-        return None
-
-
-# @st.cache_data
+    except Exception: return None
+#@st.cache_data
 @st.cache_data(ttl=20000)
 def get_sentiment_trend_report(date_list: list):
     """一日一行，增量对齐更新逻辑"""
@@ -198,7 +192,7 @@ def get_sentiment_trend_report(date_list: list):
     if not old_df.empty and '收盘_总额' in old_df.columns:
         # 认为如果有“收盘_总额”且大于 0，则该日收盘数据已完整
         processed_dates = set(old_df[old_df['收盘_总额'] > 0]['日期'].tolist())
-
+    
     needed_dates = [d for d in date_list if d.strftime('%Y-%m-%d') not in processed_dates]
 
     # 3. 执行增量计算
@@ -206,7 +200,7 @@ def get_sentiment_trend_report(date_list: list):
     if needed_dates:
         with ThreadPoolExecutor(max_workers=6) as executor:
             new_results = [r for r in executor.map(process_single_date, needed_dates) if r is not None]
-
+    
     if not new_results and old_df.empty:
         return pd.DataFrame()
 
@@ -233,8 +227,7 @@ def get_sentiment_trend_report(date_list: list):
 
     for p in ['竞价', '收盘']:
         # 确保基础统计列存在
-        for k in ['总额', '上海额', '创业额', '上涨数', '下跌数', '沪涨', '沪跌', '创涨', '创跌', '涨停', '跌停',
-                  '强力', '极弱']:
+        for k in ['总额', '上海额', '创业额', '上涨数', '下跌数', '沪涨', '沪跌', '创涨', '创跌', '涨停', '跌停', '强力', '极弱']:
             col = f"{p}_{k}"
             if col not in combined_df.columns:
                 combined_df[col] = 0.0
@@ -263,7 +256,7 @@ def get_sentiment_trend_report(date_list: list):
             f'{p}_涨停_diff', f'{p}_跌停_diff', f'{p}_强力_diff', f'{p}_极弱_diff'
         ]
         combined_df.loc[mask, derived_cols] = 0
-
+        
         # 确保 diff 列为整数类型（在抹平之后转换）
         for col in [f'{p}_涨停_diff', f'{p}_跌停_diff', f'{p}_强力_diff', f'{p}_极弱_diff']:
             combined_df[col] = combined_df[col].fillna(0).astype(int)

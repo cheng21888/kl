@@ -43,44 +43,28 @@ def render_sentiment_dashboard(df: pd.DataFrame):
         cols = st.columns([1.2, 1, 1, 1, 1.1, 1.1], gap="small")
         
         with cols[0]:
-            delta = latest['竞价_资金增减']
-            delta_color = "inverse"  # 正值红色，负值绿色
-            st.metric("竞价总额", f"{latest['竞价_总额']:.2f} 亿", delta=f"{delta:.2f} 亿", delta_color=delta_color, label_visibility="visible")
+            st.metric("竞价总额", f"{latest['竞价_总额']:.2f} 亿", delta=f"{latest['竞价_资金增减']:.2f} 亿", label_visibility="visible")
         with cols[1]:
-            delta = latest['竞价_全场涨跌比'] - prev['竞价_全场涨跌比']
-            delta_color = "inverse"
             st.metric("全场涨跌比", f"{latest['竞价_全场涨跌比']:.2f}", 
-                      delta=f"{delta:.2f}", delta_color=delta_color, label_visibility="visible")
+                      delta=f"{latest['竞价_全场涨跌比'] - prev['竞价_全场涨跌比']:.2f}", label_visibility="visible")
         with cols[2]:
-            delta = latest.get('竞价_上海差值', 0)
-            delta_color = "inverse"
             st.metric("上海涨跌比", f"{latest.get('竞价_上海涨跌比', 0):.2f}", 
-                      delta=f"{delta:+.2f} 亿", delta_color=delta_color, label_visibility="visible")
+                      delta=f"{latest.get('竞价_上海差值', 0):+.2f} 亿", label_visibility="visible")
         with cols[3]:
-            delta = latest.get('竞价_创业差值', 0)
-            delta_color = "inverse"
             st.metric("创业涨跌比", f"{latest.get('竞价_创业涨跌比', 0):.2f}", 
-                      delta=f"{delta:+.2f} 亿", delta_color=delta_color, label_visibility="visible")
+                      delta=f"{latest.get('竞价_创业差值', 0):+.2f} 亿", label_visibility="visible")
         with cols[4]:
             up = int(latest.get('竞价_涨停', 0))
             down = int(latest.get('竞价_跌停', 0))
             up_diff = int(latest.get('竞价_涨停_diff', 0))
             down_diff = int(latest.get('竞价_跌停_diff', 0))
-            delta_text = f"{up_diff:+d} / {down_diff:+d}"
-            # 计算综合变化：涨停增加或跌停减少为正
-            net_change = up_diff - down_diff
-            delta_color = "inverse"
-            st.metric("竞价涨/跌停", f"{up} / {down}", delta=delta_text, delta_color=delta_color, label_visibility="visible")
+            st.metric("竞价涨/跌停", f"{up} / {down}", delta=f"{up_diff:+d} / {down_diff:+d}", label_visibility="visible")
         with cols[5]:
             strong = int(latest.get('竞价_强力', 0))
             weak = int(latest.get('竞价_极弱', 0))
             s_diff = int(latest.get('竞价_强力_diff', 0))
             w_diff = int(latest.get('竞价_极弱_diff', 0))
-            delta_text = f"{s_diff:+d} / {w_diff:+d}"
-            # 计算综合变化：强力增加或极弱减少为正
-            net_change = s_diff - w_diff
-            delta_color = "inverse"
-            st.metric("竞价强力|弱力", f"{strong} / {weak}", delta=delta_text, delta_color=delta_color, label_visibility="visible")
+            st.metric("竞价强力|弱力", f"{strong} / {weak}", delta=f"{s_diff:+d} / {w_diff:+d}", label_visibility="visible")
 
     # --- 2. 收盘指标区 ---
     if '收盘_总额' in df.columns and not pd.isna(latest['收盘_总额']):
@@ -92,39 +76,28 @@ def render_sentiment_dashboard(df: pd.DataFrame):
             cols = st.columns([1.2, 1, 1, 1, 1.1, 1.1], gap="small")
             
             with cols[0]:
-                delta = latest['收盘_资金增减']
-                delta_color = "inverse"  # 正值红色，负值绿色
-                st.metric("收盘总额", f"{latest['收盘_总额']:.2f} 亿", delta=f"{delta:.2f} 亿", delta_color=delta_color, label_visibility="visible")
+                st.metric("收盘总额", f"{latest['收盘_总额']:.2f} 亿", delta=f"{latest['收盘_资金增减']:.2f} 亿", label_visibility="visible")
             with cols[1]:
                 repair = latest['收盘_全场涨跌比'] - latest['竞价_全场涨跌比']
-                delta_color = "inverse"
-                st.metric("收盘涨跌比", f"{latest['收盘_全场涨跌比']:.2f}", delta=f" {repair:.2f}盘中", delta_color=delta_color, label_visibility="visible")
+                st.metric("收盘涨跌比", f"{latest['收盘_全场涨跌比']:.2f}", delta=f" {repair:.2f}盘中", label_visibility="visible")
             with cols[2]:
-                delta = latest.get('收盘_上海差值', 0)
-                delta_color = "inverse"
                 st.metric("上海涨跌比", f"{latest.get('收盘_上海涨跌比', 0):.2f}", 
-                          delta=f"{delta:+.2f} 亿", delta_color=delta_color, label_visibility="visible")
+                          delta=f"{latest.get('收盘_上海差值', 0):+.2f} 亿", label_visibility="visible")
             with cols[3]:
-                delta = latest.get('收盘_创业差值', 0)
-                delta_color = "inverse"
                 st.metric("创业涨跌比", f"{latest.get('收盘_创业涨跌比', 0):.2f}", 
-                          delta=f"{delta:+.2f} 亿", delta_color=delta_color, label_visibility="visible")
+                          delta=f"{latest.get('收盘_创业差值', 0):+.2f} 亿", label_visibility="visible")
             with cols[4]:
                 up = int(latest.get('收盘_涨停', 0))
                 down = int(latest.get('收盘_跌停', 0))
                 up_diff = int(latest.get('收盘_涨停_diff', 0))
                 down_diff = int(latest.get('收盘_跌停_diff', 0))
-                delta_text = f"{up_diff:+d} / {down_diff:+d}"
-                delta_color = "inverse"
-                st.metric("收盘涨/跌停", f"{up} / {down}", delta=delta_text, delta_color=delta_color, label_visibility="visible")
+                st.metric("收盘涨/跌停", f"{up} / {down}", delta=f"{up_diff:+d} / {down_diff:+d}", label_visibility="visible")
             with cols[5]:
                 strong = int(latest.get('收盘_强力', 0))
                 weak = int(latest.get('收盘_极弱', 0))
                 s_diff = int(latest.get('收盘_强力_diff', 0))
                 w_diff = int(latest.get('收盘_极弱_diff', 0))
-                delta_text = f"{s_diff:+d} / {w_diff:+d}"
-                delta_color = "inverse"
-                st.metric("收盘强力|弱力", f"{strong} / {weak}", delta=delta_text, delta_color=delta_color, label_visibility="visible")
+                st.metric("收盘强力|弱力", f"{strong} / {weak}", delta=f"{s_diff:+d} / {w_diff:+d}", label_visibility="visible")
     else:
         st.info("💡 当前为早盘阶段，收盘数据尚未同步。")
 

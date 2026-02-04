@@ -1,7 +1,7 @@
 # modules/ui_top_stocks.py
 import streamlit as st
 import pandas as pd
-from modules.data_loader import read_market_data
+from mod.data_loader import read_market_data
 
 def render_top_turnover_page(target_date_obj):
     st.header(f"🏆 成交额活跃榜单 ({target_date_obj.strftime('%Y-%m-%d')})")

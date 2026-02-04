@@ -118,14 +118,14 @@ def check_password():
     else:
         return True
 
-def trigger_github_action():
-    """通过 GitHub API 远程触发数据抓取任务"""
+def trigger_action(event_type):
+    """通用 GitHub API 触发函数"""
     token = st.secrets.get("GITHUB_TOKEN")
     owner = st.secrets.get("GITHUB_USER")
     repo = st.secrets.get("GITHUB_REPO")
     
     if not all([token, owner, repo]):
-        st.error("未配置 GitHub Secrets")
+        st.error("❌ Streamlit Cloud Secrets 未配置 (GITHUB_TOKEN/USER/REPO)")
         return False
     
     url = f"https://api.github.com/repos/{owner}/{repo}/dispatches"
@@ -133,18 +133,20 @@ def trigger_github_action():
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github.v3+json"
     }
-    data = {"event_type": "manual_fetch_trigger"}
+    # payload 中的 event_type 必须对应 YAML 中的 types
+    data = {"event_type": event_type}
     
     try:
         response = requests.post(url, json=data, headers=headers)
         if response.status_code == 204:
-            st.success("🚀 指令已发出！机器人已开始抓取。")
+            st.success(f"🚀 指令已发出：{event_type}")
             return True
         else:
-            st.error(f"❌ 触发失败：{response.status_code}")
+            # 常见的 401 说明 Token 没填对，404 说明用户名或仓库名不对
+            st.error(f"❌ 触发失败，状态码：{response.status_code}")
             return False
     except Exception as e:
-        st.error(f"🌐 连接失败: {e}")
+        st.error(f"🌐 远程连接失败: {e}")
         return False
 
 def run_data_download_script():
