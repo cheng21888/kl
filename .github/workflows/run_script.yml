@@ -2,14 +2,12 @@ name: Stock Monitor Task
 
 on:
   schedule:
-    # 竞价时间：北京时间 09:18 触发（周一至周五）
-    - cron: '18 09 * * 1-5'
-      timezone: Asia/Shanghai  # 关键：指定北京时间
-    # 收盘时间：北京时间 15:05 触发（周一至周五）
-    - cron: '05 15 * * 1-5'
-      timezone: Asia/Shanghai  # 关键：指定北京时间
+    # 竞价时间：北京时间 09:18 (提前启动等待) -> UTC 01:18
+    - cron: '18 1 * * 1-5'
+    # 收盘时间：北京时间 15:05 -> UTC 07:05
+    - cron: '05 7 * * 1-5'
   workflow_dispatch: # 支持手动触发
-  repository_dispatch: # 允许外部 API 触发
+  repository_dispatch: # <--- 核心修改：允许外部 API 触发
     types: [stock_monitor_trigger] # 自定义触发事件名称
 
 jobs:
