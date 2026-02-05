@@ -54,10 +54,10 @@ def report_top_amount_stocks(df: pd.DataFrame, top_n: int = 12):
 def report_top_stocks(df: pd.DataFrame):
     """输出个股异动报告"""
     print("\n## 3. 个股竞价异动穿透")
-    top_inc = df.nlargest(10, '增量(亿)')
+    top_inc = df.nlargest(15, '增量(亿)')
     print_md_table(top_inc[['股票简称', '涨跌幅', '增量(亿)', '结构标签', '热点标签']],
                    "3.1 竞价增量 Top 10", "资金流入最显著的个股")
-    top_dec = df.nsmallest(10, '增量(亿)')
+    top_dec = df.nsmallest(15, '增量(亿)')
     print_md_table(top_dec[['股票简称', '涨跌幅', '增量(亿)', '结构标签', '热点标签']],
                    "3.2 竞价减量 Top 10", "资金流出最显著的个股")
 
@@ -74,6 +74,20 @@ def report_sector_flow(df: pd.DataFrame, total_abs: float):
     sector_grp['占比%'] = (sector_grp['增量_亿'].abs() / total_abs * 100).round(2)
     top_sectors = sector_grp.sort_values('增量_亿', ascending=False).head(10)
     print_md_table(top_sectors, "4.1 行业增量榜", "资金流入前十行业")
+    
+    
+def report_sector_gainian(df: pd.DataFrame, total_abs: float):
+    """输出概念流向报告"""
+    if '所属行业' not in df.columns: return
+    print("\n## 4. 概念资金分布")
+    sector_grp = df.groupby('所属概念').agg(
+        增量_亿=('增量(亿)', 'sum'),
+        平均涨幅=('涨跌幅', 'mean'),
+        家数=('股票代码', 'count')
+    ).reset_index()
+    sector_grp['占比%'] = (sector_grp['增量_亿'].abs() / total_abs * 100).round(2)
+    top_sectors = sector_grp.sort_values('增量_亿', ascending=False).head(10)
+    print_md_table(top_sectors, "4.1 概念增量榜", "资金流入前十概念")
 
 
 def report_hot_concepts(stats: list):

@@ -3,14 +3,14 @@ import io
 import contextlib
 import pandas as pd
 from datetime import datetime
-from modules.config import SAVE_DIR
+from mod.config import SAVE_DIR
 from mod.data_loader import get_trade_dates
 from mod.analyzer import (
     analyze_auction_flow, calculate_hot_concepts, calculate_auto_concepts, build_zt_tags
 )
 from mod.reporter import (
     report_overview, report_top_stocks, report_sector_flow, report_top_amount_stocks,
-    report_hot_concepts, report_auto_concepts, report_zt_stocks
+    report_hot_concepts, report_auto_concepts, report_zt_stocks,report_sector_gainian
 )
 
 
@@ -115,6 +115,7 @@ def get_auction_analysis_data(today_date, prev_date):
         report_top_amount_stocks(df, top_n=12)
         report_top_stocks(df)
         report_sector_flow(df, total_abs)
+        report_sector_gainian(df, total_abs)
         report_hot_concepts(hot_concept_stats)
         report_auto_concepts(auto_concept_df, top_n=10)
         report_zt_stocks(today_date, prev_date, df_zt)
