@@ -123,6 +123,40 @@ def report_9pct_stocks(today_date: datetime, prev_date: datetime, df_9pct: pd.Da
     return df_9pct  # 返回数据
 
 
+def report_9p(today_date: datetime, prev_date: datetime, df_9pct: pd.DataFrame) -> pd.DataFrame:
+    """ 输出竞价涨幅＞9%个股分析报告（适配无封单额、按竞价金额排序） """
+    print(f"\n# 📈 竞价涨幅＞9%个股分析 ({today_date.strftime('%Y-%m-%d')})")
+
+    # 1. 核心统计汇总
+    p9_count = len(df_9pct)
+    cm20_count = len(df_9pct[df_9pct['涨跌幅'] > 19]) if '涨跌幅' in df_9pct.columns else 0
+
+    print(f"\n**今日竞价涨幅＞9%总数**: {p9_count} 只 (其中 20CM: {cm20_count} 只)")
+
+    # 2. 竞价金额统计（适配现有字段，与report_top_amount_stocks保持单位一致）
+    if '竞价金额_今' in df_9pct.columns:
+        avg_amt = (df_9pct['竞价金额_今'].mean() / 1e8).round(4)
+        max_amt = (df_9pct['竞价金额_今'].max() / 1e8).round(4)
+        print(f"**竞价金额统计**: 平均 {avg_amt} 亿 | 最高 {max_amt} 亿")
+
+    # 3. 详情表处理（按竞价金额降序，单位转换为亿，保留4位小数）
+    df_display = df_9pct.copy()
+    if '竞价金额_今' in df_display.columns:
+        df_display = df_display.sort_values('竞价金额_今', ascending=False)
+        df_display['竞价金额(亿)'] = (df_display['竞价金额_今'] / 1e8).round(4)
+
+    # 定义展示列（自动过滤不存在的列，兼容现有数据结构）
+    show_cols = ['股票简称', '涨跌幅', '竞价金额(亿)', '增量(亿)', '所属概念', '流通市值(亿)', '结构标签', '热点标签']
+    final_show = [c for c in show_cols if c in df_display.columns]
+
+    # 输出markdown表格（复用现有工具逻辑，与其他报告格式统一）
+    print(pd.DataFrame(df_display[final_show]).to_markdown(index=False))
+
+    # 4. 在表格下方单独分析本表格的关键词
+    analyze_single_table_keywords(df_9pct, "竞价涨幅＞9%", top_n=5)
+
+    return df_9pct  # 返回数据
+
 # ---------------------- 修改：竞价涨幅＞7%分析函数 ----------------------
 def report_7pct_stocks(today_date: datetime, prev_date: datetime, df_7pct: pd.DataFrame) -> pd.DataFrame:
     """ 输出竞价涨幅＞7%个股分析报告（适配无封单额、按竞价金额排序，与9%逻辑完全对齐） """
