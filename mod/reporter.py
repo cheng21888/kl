@@ -79,7 +79,7 @@ def report_sector_flow(df: pd.DataFrame, total_abs: float):
 def report_sector_gainian(df: pd.DataFrame, total_abs: float):
     """输出概念流向报告"""
     if '所属行业' not in df.columns: return
-    print("\n## 4. 概念资金分布")
+    print("\n## 5. 概念资金分布")
     sector_grp = df.groupby('所属概念').agg(
         增量_亿=('增量(亿)', 'sum'),
         平均涨幅=('涨跌幅', 'mean'),
@@ -93,7 +93,7 @@ def report_sector_gainian(df: pd.DataFrame, total_abs: float):
 def report_hot_concepts(stats: list):
     """输出热门概念报告"""
     if not stats: return
-    print("\n## 5. 重点题材穿透")
+    print("\n## 6. 重点题材穿透")
     stats_df = pd.DataFrame(stats).sort_values('强度得分', ascending=False)
     print_md_table(
         stats_df[['热门概念', '个股数', '红盘率%', '平均涨跌%', '增量(亿)', '强度得分', '增量先锋', '先锋标签']].head(
@@ -106,12 +106,12 @@ def report_hot_concepts(stats: list):
 def report_auto_concepts(final_df: pd.DataFrame, top_n: int = 10):
     """输出题材共振雷达报告"""
     if final_df.empty: return
-    print("\n## 6. 🚀 题材资金共振雷达")
+    print("\n## 7. 🚀 题材资金共振雷达")
     display_df = final_df.head(top_n)
     cols = ['题材名称', '家数', '红盘率%', '平均涨跌%', '资金增量(亿)', '状态', '增量先锋']
     print_md_table(display_df[cols], "6.1 题材资金共振雷达 (Top 10)", "综合增量、合力程度及领涨个股性质")
 
-    print("\n### 6.2 强势或主流方向可能的概念题材扩散方向")
+    print("\n### 7.2 强势或主流方向可能的概念题材扩散方向")
 
     # 修改筛选条件：增加对昨日首板的判断
     filter_cond = (
