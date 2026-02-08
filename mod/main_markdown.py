@@ -180,7 +180,6 @@ def render_auction_report_tab(selected_date=None, prev_date=None):
         with tab_auto:
             st.subheader("🤖 题材共振监控")
             auto_df = data["auto_df"].copy()
-            auto = data["auto"].copy()
             auto_df['is_62'] = (
                     (auto_df['家数'] > 10) & (auto_df['红盘率%'] > 75) &
                     (auto_df['平均涨跌%'] > 1.2) & (auto_df['资金增量(亿)'] > 1)
@@ -191,6 +190,8 @@ def render_auction_report_tab(selected_date=None, prev_date=None):
 
         with tab_hot:
             st.dataframe(data["hot_stats"], use_container_width=True)
+        with tab_jian:
+            st.dataframe(data["auto"], use_container_width=True)
 
         st.divider()
         st.subheader("📝 完整报告正文")
