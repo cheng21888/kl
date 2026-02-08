@@ -2,17 +2,17 @@ import streamlit as st
 import io
 import contextlib
 import pandas as pd
+import numpy as np
 from datetime import datetime
 from mod.config import SAVE_DIR
 from mod.data_loader import get_trade_dates
 from mod.analyzer import (
-    analyze_auction_flow, calculate_hot_concepts,calculate_auto, calculate_auto_concepts, build_zt_tags
+    analyze_auction_flow, calculate_hot_concepts, calculate_auto_concepts, build_zt_tags
 )
 from mod.reporter import (
     report_overview, report_top_stocks, report_sector_flow, report_top_amount_stocks,
-    report_hot_concepts, report_auto_concepts, report_auto,report_zt_stocks
+    report_hot_concepts, report_auto_concepts, report_zt_stocks
 )
-
 
 # ---------------------- 新增：竞价涨幅＞9%分析函数 ----------------------
 def report_9pct_stocks(today_date: datetime, prev_date: datetime, df_9pct: pd.DataFrame) -> None:
@@ -45,7 +45,89 @@ def report_9pct_stocks(today_date: datetime, prev_date: datetime, df_9pct: pd.Da
     print(pd.DataFrame(df_display[final_show]).to_markdown(index=False))
 
 
+# ---------------------- 新增：从analyzer.py导入的函数 ----------------------
+def calculate_auto(df: pd.DataFrame) -> pd.DataFrame:
+    """自动识别并计算题材共振数据"""
+    if df.empty or '所属概念' not in df.columns: 
+        return pd.DataFrame()
+
+    df_c = df.copy()
+    df_c['涨跌幅_num'] = pd.to_numeric(df_c['涨跌幅'], errors='coerce').fillna(0)
+    df_c['tag_list'] = (df_c['所属概念'].fillna('') + ';' + df_c['所属行业'].fillna('')).str.replace('，', ';').str.split(';')
+    
+    exploded = df_c.explode('tag_list').rename(columns={'tag_list': '题材名称'})
+    
+    # 定义BLACKLIST（如果原文件中有定义，请确保导入）
+    BLACKLIST = ['', ' ', '--', 'None', 'nan']  # 示例黑名单，请根据实际情况调整
+    
+    exploded = exploded[(~exploded['题材名称'].isin(BLACKLIST)) & (exploded['题材名称'].str.len() >= 2)]
+    if exploded.empty: 
+        return pd.DataFrame()
+
+    concept_grp = exploded.groupby('题材名称').agg(
+        家数=('股票代码', 'count'),
+        红盘率_val=('涨跌幅_num', lambda x: (x > 0).mean() * 100),
+        平均涨跌_val=('涨跌幅_num', 'mean'),
+        资金增量_亿=('增量(亿)', 'sum')
+    )
+
+    exploded['rank'] = exploded.groupby('题材名称')['增量(亿)'].rank(ascending=True, method='first')
+    top2_stats = exploded[exploded['rank'] <= 2].groupby('题材名称')['增量(亿)'].sum()
+    concept_grp['top2_sum'] = top2_stats
+    
+    concept_grp['状态'] = np.where(
+        (concept_grp['top2_sum'] / concept_grp['资金增量_亿'].replace(0, 1) > 0.7),
+        "单兵(抱团)", "板块(合力)"
+    )
+
+    leaders = exploded[exploded['rank'] == 1].copy()
+    leaders['增量先锋'] = (
+        leaders['股票简称'] + "(" + leaders['涨跌幅'].astype(str) + "%) " + 
+        "[" + leaders['结构标签'].fillna('--') + "]"
+    )
+
+    final = concept_grp.merge(leaders[['题材名称', '增量先锋']], on='题材名称', how='left')
+    final = final[
+        (final['家数'] >= 4) & (final['家数'] <= 100) & 
+        (final['资金增量_亿'] > 0.3) & (final['平均涨跌_val'] > 0)
+    ]
+    
+    final = final.rename(columns={
+        '红盘率_val': '红盘率%', '平均涨跌_val': '平均涨跌%', '资金增量_亿': '资金增量(亿)'
+    })
+    
+    return final
+
+
+# ---------------------- 新增：从reporter.py导入的函数 ----------------------
+def report_auto(final_df: pd.DataFrame, top_n: int = 10):
+    """输出题材共振雷达报告"""
+    if final_df.empty: 
+        return
+    
+    print("\n## 7. 🚀 题材资金共振雷达")
+    display_df = final_df.head(top_n)
+    cols = ['题材名称', '家数', '红盘率%', '平均涨跌%', '资金增量(亿)', '状态', '增量先锋']
+    
+    # 使用print_markdown_table函数（如果已定义）或使用pandas的to_markdown
+    try:
+        print_md_table(display_df[cols], "6.1 题材资金共振雷达 (Top 10)", "综合增量、合力程度及领涨个股性质")
+    except NameError:
+        # 如果print_md_table未定义，使用pandas默认输出
+        print(display_df[cols].to_markdown(index=False))
+
+
+# ---------------------- 辅助函数：如果print_md_table未定义 ----------------------
+def print_md_table(df, title, description):
+    """简单的Markdown表格输出函数"""
+    print(f"\n### {title}")
+    print(f"*{description}*")
+    print(df.to_markdown(index=False))
+    print()
+
+
 # ------------------------------------------------------------------------
+
 
 def highlight_6_2(row):
     # 1. 定义 6.2 的五个核心条件判定
@@ -105,11 +187,10 @@ def get_auction_analysis_data(today_date, prev_date):
 
     # 2. 计算其他题材数据
     total_abs = df['增量(亿)'].abs().sum()
-    total_j=df['减量(亿)'].abs().sum()
+    total_j = df['减量(亿)'].abs().sum()
     hot_concept_stats = calculate_hot_concepts(df)
     auto_concept_df = calculate_auto_concepts(df)
-    auto_concept = calculate_auto(df)
-
+    
     # 3. 捕获 Markdown 输出（新增report_9pct_stocks调用，放在report_zt_stocks后）
     output_buffer = io.StringIO()
     with contextlib.redirect_stdout(output_buffer):
@@ -119,8 +200,11 @@ def get_auction_analysis_data(today_date, prev_date):
         report_sector_flow(df, total_abs)
         report_hot_concepts(hot_concept_stats)
         report_auto_concepts(auto_concept_df, top_n=10)
-        report_auto(auto_concept, top_n=10)
         report_zt_stocks(today_date, prev_date, df_zt)
+        
+        # 新增：调用题材共振雷达报告
+        auto_df = calculate_auto(df)
+        report_auto(auto_df, top_n=10)
 
     report_md_content = output_buffer.getvalue()
 
@@ -129,7 +213,6 @@ def get_auction_analysis_data(today_date, prev_date):
         "df": df,
         "hot_stats": hot_concept_stats,
         "auto_df": auto_concept_df,
-        "auto": auto_concept,
         "md_report": report_md_content,
         "df_zt": df_zt,
         # ---------------------- 新增：返回9%涨幅数据 ----------------------
@@ -181,8 +264,8 @@ def render_auction_report_tab(selected_date=None, prev_date=None):
             st.subheader("🤖 题材共振监控")
             auto_df = data["auto_df"].copy()
             auto_df['is_62'] = (
-                    (auto_df['家数'] > 10) & (auto_df['红盘率%'] > 75) &
-                    (auto_df['平均涨跌%'] > 1.2) & (auto_df['资金增量(亿)'] > 1)
+                (auto_df['家数'] > 10) & (auto_df['红盘率%'] > 75) &
+                (auto_df['平均涨跌%'] > 1.2) & (auto_df['资金增量(亿)'] > 1)
             )
             auto_df = auto_df.sort_values(by=['is_62', '平均涨跌%'], ascending=[False, False])
             styled_df = auto_df.drop(columns=['is_62']).style.apply(highlight_6_2, axis=1)
@@ -190,8 +273,6 @@ def render_auction_report_tab(selected_date=None, prev_date=None):
 
         with tab_hot:
             st.dataframe(data["hot_stats"], use_container_width=True)
-        with tab_jian:
-            st.dataframe(data["auto"], use_container_width=True)
 
         st.divider()
         st.subheader("📝 完整报告正文")
