@@ -6,11 +6,11 @@ from datetime import datetime
 from mod.config import SAVE_DIR
 from mod.data_loader import get_trade_dates
 from mod.analyzer import (
-    analyze_auction_flow, calculate_hot_concepts,auto_concept, calculate_auto_concepts, build_zt_tags
+    analyze_auction_flow, calculate_hot_concepts,calculate_auto, calculate_auto_concepts, build_zt_tags
 )
 from mod.reporter import (
     report_overview, report_top_stocks, report_sector_flow, report_top_amount_stocks,
-    report_hot_concepts, report_auto_concepts, report_zt_stocks
+    report_hot_concepts, report_auto_concepts, report_auto,report_zt_stocks
 )
 
 
