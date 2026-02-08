@@ -265,6 +265,52 @@ def calculate_auto_concepts(df: pd.DataFrame) -> pd.DataFrame:
     })
     
     return final.sort_values('资金增量(亿)', ascending=False)
+    
+def calculate_auto(df: pd.DataFrame) -> pd.DataFrame:
+    """自动识别并计算题材共振数据"""
+    if df.empty or '所属概念' not in df.columns: return pd.DataFrame()
+
+    df_c = df.copy()
+    df_c['涨跌幅_num'] = pd.to_numeric(df_c['涨跌幅'], errors='coerce').fillna(0)
+    df_c['tag_list'] = (df_c['所属概念'].fillna('') + ';' + df_c['所属行业'].fillna('')).str.replace('，', ';').str.split(';')
+    
+    exploded = df_c.explode('tag_list').rename(columns={'tag_list': '题材名称'})
+    exploded = exploded[(~exploded['题材名称'].isin(BLACKLIST)) & (exploded['题材名称'].str.len() >= 2)]
+    if exploded.empty: return pd.DataFrame()
+
+    concept_grp = exploded.groupby('题材名称').agg(
+        家数=('股票代码', 'count'),
+        红盘率_val=('涨跌幅_num', lambda x: (x > 0).mean() * 100),
+        平均涨跌_val=('涨跌幅_num', 'mean'),
+        资金增量_亿=('增量(亿)', 'sum')
+    )
+
+    exploded['rank'] = exploded.groupby('题材名称')['增量(亿)'].rank(ascending=False, method='first')
+    top2_stats = exploded[exploded['rank'] <= 2].groupby('题材名称')['增量(亿)'].sum()
+    concept_grp['top2_sum'] = top2_stats
+    
+    concept_grp['状态'] = np.where(
+        (concept_grp['top2_sum'] / concept_grp['资金增量_亿'].replace(0, 1) > 0.7),
+        "单兵(抱团)", "板块(合力)"
+    )
+
+    leaders = exploded[exploded['rank'] == 1].copy()
+    leaders['增量先锋'] = (
+        leaders['股票简称'] + "(" + leaders['涨跌幅'].astype(str) + "%) " + 
+        "[" + leaders['结构标签'].fillna('--') + "]"
+    )
+
+    final = concept_grp.merge(leaders[['题材名称', '增量先锋']], on='题材名称', how='left')
+    final = final[
+        (final['家数'] >= 4) & (final['家数'] <= 100) & 
+        (final['资金增量_亿'] > 0.3) & (final['平均涨跌_val'] > 0)
+    ]
+    
+    final = final.rename(columns={
+        '红盘率_val': '红盘率%', '平均涨跌_val': '平均涨跌%', '资金增量_亿': '资金增量(亿)'
+    })
+    
+    return final.sort_values('资金增量(亿)', ascending=False)
 
 
 def build_zt_tags(today_date: datetime, prev_date: datetime) -> pd.DataFrame:

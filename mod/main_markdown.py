@@ -6,11 +6,11 @@ from datetime import datetime
 from mod.config import SAVE_DIR
 from mod.data_loader import get_trade_dates
 from mod.analyzer import (
-    analyze_auction_flow, calculate_hot_concepts, calculate_auto_concepts, build_zt_tags
+    analyze_auction_flow, calculate_hot_concepts, calculate_auto, calculate_auto_concepts, build_zt_tags
 )
 from mod.reporter import (
     report_overview, report_top_stocks, report_sector_flow, report_top_amount_stocks,
-    report_hot_concepts, report_auto_concepts, report_zt_stocks
+    report_hot_concepts, report_auto, report_auto_concepts, report_zt_stocks
 )
 
 
@@ -107,6 +107,7 @@ def get_auction_analysis_data(today_date, prev_date):
     total_abs = df['增量(亿)'].abs().sum()
     hot_concept_stats = calculate_hot_concepts(df)
     auto_concept_df = calculate_auto_concepts(df)
+    auto_df = calculate_auto(df)  # 新增：调用 calculate_auto 函数
 
     # 3. 捕获 Markdown 输出（新增report_9pct_stocks调用，放在report_zt_stocks后）
     output_buffer = io.StringIO()
@@ -117,6 +118,7 @@ def get_auction_analysis_data(today_date, prev_date):
         report_sector_flow(df, total_abs)
         report_hot_concepts(hot_concept_stats)
         report_auto_concepts(auto_concept_df, top_n=10)
+        report_auto(auto_df, top_n=10)  # 新增：调用 report_auto 函数
         report_zt_stocks(today_date, prev_date, df_zt)
 
     report_md_content = output_buffer.getvalue()
@@ -126,6 +128,7 @@ def get_auction_analysis_data(today_date, prev_date):
         "df": df,
         "hot_stats": hot_concept_stats,
         "auto_df": auto_concept_df,
+        "auto_data": auto_df,  # 新增：返回 auto_df 数据
         "md_report": report_md_content,
         "df_zt": df_zt,
         # ---------------------- 新增：返回9%涨幅数据 ----------------------
@@ -177,8 +180,8 @@ def render_auction_report_tab(selected_date=None, prev_date=None):
             st.subheader("🤖 题材共振监控")
             auto_df = data["auto_df"].copy()
             auto_df['is_62'] = (
-                    (auto_df['家数'] > 10) & (auto_df['红盘率%'] > 75) &
-                    (auto_df['平均涨跌%'] > 1.2) & (auto_df['资金增量(亿)'] > 1)
+                (auto_df['家数'] > 10) & (auto_df['红盘率%'] > 75) &
+                (auto_df['平均涨跌%'] > 1.2) & (auto_df['资金增量(亿)'] > 1)
             )
             auto_df = auto_df.sort_values(by=['is_62', '平均涨跌%'], ascending=[False, False])
             styled_df = auto_df.drop(columns=['is_62']).style.apply(highlight_6_2, axis=1)
