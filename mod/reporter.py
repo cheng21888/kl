@@ -120,12 +120,12 @@ def report_auto_concepts(final_df: pd.DataFrame, top_n: int = 10):
 def report_auto(final_df: pd.DataFrame, top_n: int = 10):
     """输出题材共振雷达报告"""
     if final_df.empty: return
-    print("\n## 6. 🚀 题材资金共振雷达")
+    print("\n## 7. 🚀 题材资金共振雷达")
     display_df = final_df.head(top_n)
     cols = ['题材名称', '家数', '红盘率%', '平均涨跌%', '资金增量(亿)', '状态', '增量先锋']
     print_md_table(display_df[cols], "6.1 题材资金共振雷达 (Top 10)", "综合增量、合力程度及领涨个股性质")
 
-    print("\n### 6.2 强势或主流方向可能的概念题材扩散方向")
+    print("\n### 7.2 强势或主流方向可能的概念题材扩散方向")
     filter_cond = (
         (final_df['家数'] > 10) & 
         (final_df['红盘率%'] > 75) & 
