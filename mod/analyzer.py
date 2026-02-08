@@ -267,6 +267,7 @@ def calculate_auto_concepts(df: pd.DataFrame) -> pd.DataFrame:
     return final.sort_values('资金增量(亿)', ascending=False)
     
 def calculate_auto(df: pd.DataFrame) -> pd.DataFrame:
+def calculate_auto(df: pd.DataFrame) -> pd.DataFrame:
     """自动识别并计算题材共振数据"""
     if df.empty or '所属概念' not in df.columns: return pd.DataFrame()
 
@@ -285,7 +286,7 @@ def calculate_auto(df: pd.DataFrame) -> pd.DataFrame:
         资金增量_亿=('增量(亿)', 'sum')
     )
 
-    exploded['rank'] = exploded.groupby('题材名称')['增量(亿)'].rank(ascending=True, method='first')
+    exploded['rank'] = exploded.groupby('题材名称')['增量(亿)'].rank(ascending=False, method='first')
     top2_stats = exploded[exploded['rank'] <= 2].groupby('题材名称')['增量(亿)'].sum()
     concept_grp['top2_sum'] = top2_stats
     
@@ -310,7 +311,9 @@ def calculate_auto(df: pd.DataFrame) -> pd.DataFrame:
         '红盘率_val': '红盘率%', '平均涨跌_val': '平均涨跌%', '资金增量_亿': '资金增量(亿)'
     })
     
-    return final.sort_values('资金增量(亿)', ascending=False)
+    # 修改这里：将ascending改为True，按增序排列
+    return final.sort_values('资金增量(亿)', ascending=True)
+
 
 
 def build_zt_tags(today_date: datetime, prev_date: datetime) -> pd.DataFrame:
