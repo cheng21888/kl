@@ -285,7 +285,7 @@ def calculate_auto(df: pd.DataFrame) -> pd.DataFrame:
         资金增量_亿=('增量(亿)', 'sum')
     )
 
-    exploded['rank'] = exploded.groupby('题材名称')['增量(亿)'].rank(ascending=False, method='first')
+    exploded['rank'] = exploded.groupby('题材名称')['增量(亿)'].rank(ascending=True, method='first')
     top2_stats = exploded[exploded['rank'] <= 2].groupby('题材名称')['增量(亿)'].sum()
     concept_grp['top2_sum'] = top2_stats
     
@@ -302,8 +302,8 @@ def calculate_auto(df: pd.DataFrame) -> pd.DataFrame:
 
     final = concept_grp.merge(leaders[['题材名称', '增量先锋']], on='题材名称', how='left')
     final = final[
-        (final['家数'] >= 4) & (final['家数'] <= 100) & 
-        (final['资金增量_亿'] > 0.3) & (final['平均涨跌_val'] > 0)
+        (final['家数'] >= 4) & (final['家数'] <= 1000) & 
+        (final['资金增量_亿'] <-1) & (final['平均涨跌_val'] <0)
     ]
     
     final = final.rename(columns={
@@ -311,7 +311,7 @@ def calculate_auto(df: pd.DataFrame) -> pd.DataFrame:
     })
     
     # 修改这里：将ascending改为True，按增序排列
-    return final.sort_values('资金增量(亿)', ascending=True)
+    return final.sort_values('资金增量(亿)', ascending=False)
 
 
 
