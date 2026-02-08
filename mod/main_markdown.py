@@ -2,7 +2,6 @@ import streamlit as st
 import io
 import contextlib
 import pandas as pd
-import numpy as np
 from datetime import datetime
 from mod.config import SAVE_DIR
 from mod.data_loader import get_trade_dates
@@ -14,11 +13,6 @@ from mod.reporter import (
     report_hot_concepts, report_auto_concepts, report_zt_stocks
 )
 
-# ---------------------- 新增：从analyzer.py导入的函数 ----------------------
-from mod.analyzer import calculate_auto
-
-# ---------------------- 新增：从reporter.py导入的函数 ----------------------
-from mod.reporter import report_auto
 
 # ---------------------- 新增：竞价涨幅＞9%分析函数 ----------------------
 def report_9pct_stocks(today_date: datetime, prev_date: datetime, df_9pct: pd.DataFrame) -> None:
@@ -49,15 +43,6 @@ def report_9pct_stocks(today_date: datetime, prev_date: datetime, df_9pct: pd.Da
 
     # 输出markdown表格（复用现有工具逻辑，与其他报告格式统一）
     print(pd.DataFrame(df_display[final_show]).to_markdown(index=False))
-
-
-# ---------------------- 辅助函数：如果print_md_table未定义 ----------------------
-def print_md_table(df, title, description):
-    """简单的Markdown表格输出函数"""
-    print(f"\n### {title}")
-    print(f"*{description}*")
-    print(df.to_markdown(index=False))
-    print()
 
 
 # ------------------------------------------------------------------------
@@ -120,10 +105,9 @@ def get_auction_analysis_data(today_date, prev_date):
 
     # 2. 计算其他题材数据
     total_abs = df['增量(亿)'].abs().sum()
-    total_j = df['减量(亿)'].abs().sum()
     hot_concept_stats = calculate_hot_concepts(df)
     auto_concept_df = calculate_auto_concepts(df)
-    
+
     # 3. 捕获 Markdown 输出（新增report_9pct_stocks调用，放在report_zt_stocks后）
     output_buffer = io.StringIO()
     with contextlib.redirect_stdout(output_buffer):
@@ -134,10 +118,6 @@ def get_auction_analysis_data(today_date, prev_date):
         report_hot_concepts(hot_concept_stats)
         report_auto_concepts(auto_concept_df, top_n=10)
         report_zt_stocks(today_date, prev_date, df_zt)
-        
-        # 新增：调用题材共振雷达报告
-        auto_df = calculate_auto(df)  # 使用导入的函数
-        report_auto(auto_df, top_n=10)  # 使用导入的函数
 
     report_md_content = output_buffer.getvalue()
 
@@ -197,8 +177,8 @@ def render_auction_report_tab(selected_date=None, prev_date=None):
             st.subheader("🤖 题材共振监控")
             auto_df = data["auto_df"].copy()
             auto_df['is_62'] = (
-                (auto_df['家数'] > 10) & (auto_df['红盘率%'] > 75) &
-                (auto_df['平均涨跌%'] > 1.2) & (auto_df['资金增量(亿)'] > 1)
+                    (auto_df['家数'] > 10) & (auto_df['红盘率%'] > 75) &
+                    (auto_df['平均涨跌%'] > 1.2) & (auto_df['资金增量(亿)'] > 1)
             )
             auto_df = auto_df.sort_values(by=['is_62', '平均涨跌%'], ascending=[False, False])
             styled_df = auto_df.drop(columns=['is_62']).style.apply(highlight_6_2, axis=1)
