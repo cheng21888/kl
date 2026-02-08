@@ -114,6 +114,42 @@ def report_auto_concepts(final_df: pd.DataFrame, top_n: int = 10):
         print(f"2. 扩散逻辑：这类题材具备「资金充足+板块共识+放量突破」特征，后续可能向细分赛道/上下游题材扩散；")
         print(f"3. 关注要点：优先跟踪增量先锋中「突发放量」个股的持续性，以及题材内补涨标的机会。")
         print(f"**4. 板块强势股的低吸，前两日异动竞价个股的承接。//抑或是新题材发力抢夺资金（平量缩量市场）**")
+        
+        
+
+def report_auto(final_df: pd.DataFrame, top_n: int = 10):
+    """输出题材共振雷达报告"""
+    if final_df.empty: return
+    print("\n## 6. 🚀 题材资金共振雷达")
+    display_df = final_df.head(top_n)
+    cols = ['题材名称', '家数', '红盘率%', '平均涨跌%', '资金增量(亿)', '状态', '增量先锋']
+    print_md_table(display_df[cols], "6.1 题材资金共振雷达 (Top 10)", "综合增量、合力程度及领涨个股性质")
+
+    print("\n### 6.2 强势或主流方向可能的概念题材扩散方向")
+    filter_cond = (
+        (final_df['家数'] > 10) & 
+        (final_df['红盘率%'] > 75) & 
+        (final_df['平均涨跌%'] > 1.2) & 
+        (final_df['资金增量(亿)'] > 1) & 
+        (final_df['增量先锋'].str.contains('突发放量', na=False))
+    )
+    strong_concepts = final_df[filter_cond].copy()
+
+    if strong_concepts.empty:
+        print("暂无满足「家数>10、红盘率>75%、平均涨跌>1.2%、资金增量>1亿、增量先锋含突发放量」的强势题材")
+    else:
+        strong_concepts_sorted = strong_concepts.sort_values('资金增量(亿)', ascending=False)
+        output_cols = ['题材名称', '家数', '红盘率%', '平均涨跌%', '资金增量(亿)', '状态', '增量先锋']
+        print_md_table(strong_concepts_sorted[output_cols], "强势题材扩散候选池", "满足高活跃度+资金增量+突发放量的主流方向，具备题材扩散潜力")
+        
+        top_3_concepts = strong_concepts_sorted['题材名称'].head(3).tolist()
+        print(f"\n#### 扩散方向分析：")
+        print(f"1. 核心扩散主线：{', '.join(top_3_concepts) if top_3_concepts else '无'}（资金增量领先+高红盘率+放量领涨）；")
+        print(f"2. 扩散逻辑：这类题材具备「资金充足+板块共识+放量突破」特征，后续可能向细分赛道/上下游题材扩散；")
+        print(f"3. 关注要点：优先跟踪增量先锋中「突发放量」个股的持续性，以及题材内补涨标的机会。")
+        print(f"**4. 板块强势股的低吸，前两日异动竞价个股的承接。//抑或是新题材发力抢夺资金（平量缩量市场）**")
+
+
 
 
 def report_zt_stocks(today_date: datetime, prev_date: datetime, df_zt: pd.DataFrame) -> None:
