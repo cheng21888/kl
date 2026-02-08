@@ -267,7 +267,6 @@ def calculate_auto_concepts(df: pd.DataFrame) -> pd.DataFrame:
     return final.sort_values('资金增量(亿)', ascending=False)
     
 def calculate_auto(df: pd.DataFrame) -> pd.DataFrame:
-def calculate_auto(df: pd.DataFrame) -> pd.DataFrame:
     """自动识别并计算题材共振数据"""
     if df.empty or '所属概念' not in df.columns: return pd.DataFrame()
 
