@@ -301,11 +301,16 @@ def calculate_auto(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     final = concept_grp.merge(leaders[['题材名称', '增量先锋']], on='题材名称', how='left')
-    final = final[
-        ((final['家数'] >= 4) & (final['家数'] <= 1000) & 
-        (final['资金增量_亿'] <0) & (final['平均涨跌_val'] <-3)) | ((final['家数'] >= 4) & (final['家数'] <= 1000) & 
-        (final['资金增量_亿'] >0.5) & (final['平均涨跌_val'] <-3))
     
+    # 修改部分：使用 OR 条件组合两种不同的筛选规则
+    final = final[
+        (final['家数'] >= 4) & (final['家数'] <= 1000) & 
+        (
+            # 原条件：资金净流出且平均跌幅较大
+            ((final['资金增量_亿'] < 0) & (final['平均涨跌_val'] < -3)) |
+            # 新增条件：资金净流入且平均跌幅较大
+            ((final['资金增量_亿'] > 0.5) & (final['平均涨跌_val'] < -3))
+        )
     ]
     
     final = final.rename(columns={
@@ -314,6 +319,7 @@ def calculate_auto(df: pd.DataFrame) -> pd.DataFrame:
     
     # 修改这里：将ascending改为True，按增序排列
     return final.sort_values('资金增量(亿)', ascending=False)
+
 
 
 
