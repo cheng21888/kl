@@ -220,51 +220,72 @@ def calculate_hot_concepts(df: pd.DataFrame) -> List[Dict[str, Any]]:
         })
     return stats
 
-def calculate_auto_concepts(df: pd.DataFrame) -> pd.DataFrame:
+def calculate_auto(df: pd.DataFrame) -> pd.DataFrame:
     """自动识别并计算题材共振数据"""
-    if df.empty or '所属概念' not in df.columns: return pd.DataFrame()
+    if df.empty or '所属概念' not in df.columns: 
+        return pd.DataFrame()
 
     df_c = df.copy()
+    # 确保数值列处理正确
     df_c['涨跌幅_num'] = pd.to_numeric(df_c['涨跌幅'], errors='coerce').fillna(0)
+    df_c['增量_亿_num'] = pd.to_numeric(df_c['增量(亿)'], errors='coerce').fillna(0)
+    
+    # 处理概念标签
     df_c['tag_list'] = (df_c['所属概念'].fillna('') + ';' + df_c['所属行业'].fillna('')).str.replace('，', ';').str.split(';')
     
     exploded = df_c.explode('tag_list').rename(columns={'tag_list': '题材名称'})
     exploded = exploded[(~exploded['题材名称'].isin(BLACKLIST)) & (exploded['题材名称'].str.len() >= 2)]
-    if exploded.empty: return pd.DataFrame()
+    if exploded.empty: 
+        return pd.DataFrame()
 
+    # 分组统计
     concept_grp = exploded.groupby('题材名称').agg(
         家数=('股票代码', 'count'),
         红盘率_val=('涨跌幅_num', lambda x: (x > 0).mean() * 100),
         平均涨跌_val=('涨跌幅_num', 'mean'),
-        资金增量_亿=('增量(亿)', 'sum')
-    )
+        资金增量_亿=('增量_亿_num', 'sum')
+    ).reset_index()
 
-    exploded['rank'] = exploded.groupby('题材名称')['增量(亿)'].rank(ascending=False, method='first')
-    top2_stats = exploded[exploded['rank'] <= 2].groupby('题材名称')['增量(亿)'].sum()
-    concept_grp['top2_sum'] = top2_stats
+    # 计算排名和top2统计
+    exploded['rank'] = exploded.groupby('题材名称')['涨跌幅_num'].rank(ascending=False, method='first')
+    top2_stats = exploded[exploded['rank'] <= 2].groupby('题材名称')['增量_亿_num'].sum()
+    concept_grp['top2_sum'] = concept_grp['题材名称'].map(top2_stats).fillna(0)
     
+    # 判断状态
     concept_grp['状态'] = np.where(
         (concept_grp['top2_sum'] / concept_grp['资金增量_亿'].replace(0, 1) > 0.7),
         "单兵(抱团)", "板块(合力)"
     )
 
+    # 获取龙头股信息
     leaders = exploded[exploded['rank'] == 1].copy()
     leaders['增量先锋'] = (
         leaders['股票简称'] + "(" + leaders['涨跌幅'].astype(str) + "%) " + 
         "[" + leaders['结构标签'].fillna('--') + "]"
     )
 
+    # 合并龙头信息
     final = concept_grp.merge(leaders[['题材名称', '增量先锋']], on='题材名称', how='left')
+    
+    # 修正筛选条件 - 确保列名正确
     final = final[
-        (final['家数'] >= 4) & (final['家数'] <= 100) & 
-        (final['资金增量_亿'] > 0.3) & (final['平均涨跌_val'] > 0)
+        (final['家数'] >= 4) & (final['家数'] <= 1000) & 
+        (
+            ((final['资金增量_亿'] < 0) & (final['平均涨跌_val'] < -3)) |
+            ((final['资金增量_亿'] > 0.5) & (final['平均涨跌_val'] < -3))
+        )
     ]
     
+    # 重命名列
     final = final.rename(columns={
-        '红盘率_val': '红盘率%', '平均涨跌_val': '平均涨跌%', '资金增量_亿': '资金增量(亿)'
+        '红盘率_val': '红盘率%', 
+        '平均涨跌_val': '平均涨跌%', 
+        '资金增量_亿': '资金增量(亿)'
     })
     
+    # 按资金增量排序
     return final.sort_values('资金增量(亿)', ascending=False)
+
     
 def calculate_auto(df: pd.DataFrame) -> pd.DataFrame:
     """自动识别并计算题材共振数据"""
