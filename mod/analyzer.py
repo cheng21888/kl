@@ -285,7 +285,7 @@ def calculate_auto(df: pd.DataFrame) -> pd.DataFrame:
         资金增量_亿=('增量(亿)', 'sum')
     )
 
-    exploded['rank'] = exploded.groupby('题材名称')['增量(亿)'].rank(ascending=True, method='first')
+    exploded['rank'] = exploded.groupby('题材名称')['涨跌幅_num'].rank(ascending=True, method='first')
     top2_stats = exploded[exploded['rank'] <= 2].groupby('题材名称')['增量(亿)'].sum()
     concept_grp['top2_sum'] = top2_stats
     
