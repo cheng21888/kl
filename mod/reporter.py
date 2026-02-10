@@ -38,7 +38,7 @@ def report_overview(today_date: datetime, prev_date: datetime, overview: dict):
     print(pd.DataFrame(emo_data, columns=headers).to_markdown(index=False))
 
 
-def report_top_amount_stocks(df: pd.DataFrame, top_n: int = 12):
+def report_top_amount_stocks(df: pd.DataFrame, top_n: int = 15):
     """输出成交额前N名的个股报告"""
     print(f"\n## 7. 竞价成交额 Top {top_n}")
     top_amt = df.nlargest(top_n, '竞价金额_今').copy()
@@ -50,12 +50,12 @@ def report_top_amount_stocks(df: pd.DataFrame, top_n: int = 12):
 def report_top_stocks(df: pd.DataFrame):
     """输出个股异动报告"""
     print("\n## 3. 个股竞价异动穿透")
-    top_inc = df.nlargest(10, '增量(亿)')
+    top_inc = df.nlargest(15, '增量(亿)')
     print_md_table(top_inc[['股票简称', '涨跌幅', '增量(亿)', '结构标签', '热点标签']], 
-                   "3.1 竞价增量 Top 10", "资金流入最显著的个股")
+                   "3.1 竞价增量 Top 15", "资金流入最显著的个股")
     top_dec = df.nsmallest(10, '增量(亿)')
     print_md_table(top_dec[['股票简称', '涨跌幅', '增量(亿)', '结构标签', '热点标签']], 
-                   "3.2 竞价减量 Top 10", "资金流出最显著的个股")
+                   "3.2 竞价减量 Top 15", "资金流出最显著的个股")
 
 
 def report_sector_flow(df: pd.DataFrame, total_abs: float):
