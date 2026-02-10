@@ -113,7 +113,7 @@ def get_auction_analysis_data(today_date, prev_date):
     output_buffer = io.StringIO()
     with contextlib.redirect_stdout(output_buffer):
         report_overview(today_date, prev_date, overview)
-        report_top_amount_stocks(df, top_n=12)
+        report_top_amount_stocks(df, top_n=15)
         report_top_stocks(df)
         report_sector_flow(df, total_abs)
         report_hot_concepts(hot_concept_stats)
