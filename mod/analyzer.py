@@ -285,7 +285,7 @@ def calculate_auto(df: pd.DataFrame) -> pd.DataFrame:
         资金增量_亿=('增量(亿)', 'sum')
     )
 
-    exploded['rank'] = exploded.groupby('题材名称')['涨跌幅_num'].rank(ascending=True, method='first')
+    exploded['rank'] = exploded.groupby('题材名称')['增量(亿)'].rank(ascending=False, method='first')
     top2_stats = exploded[exploded['rank'] <= 2].groupby('题材名称')['增量(亿)'].sum()
     concept_grp['top2_sum'] = top2_stats
     
@@ -304,7 +304,8 @@ def calculate_auto(df: pd.DataFrame) -> pd.DataFrame:
     final = final[
         ((final['家数'] >= 4) & (final['家数'] <= 1000) & 
         (final['资金增量_亿'] <0) & (final['平均涨跌_val'] <-3)) | ((final['家数'] >= 4) & (final['家数'] <= 1000) & 
-        (final['资金增量_亿'] >0.5) & (final['平均涨跌_val'] <-3))
+        (final['资金增量_亿'] >0.5) & (final['平均涨跌_val'] <-3)) | ((final['家数'] >= 4) & (final['家数'] <= 1000) & 
+        (final['资金增量_亿'] >0.6) & (final['平均涨跌_val'] >0.6) & (final['红盘率_val'] >75))
     ]
     
     final = final.rename(columns={
