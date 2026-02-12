@@ -257,7 +257,7 @@ def calculate_auto_concepts(df: pd.DataFrame) -> pd.DataFrame:
     final = concept_grp.merge(leaders[['题材名称', '增量先锋']], on='题材名称', how='left')
     final = final[
         (final['家数'] >= 4) & (final['家数'] <= 100) & 
-        (final['资金增量_亿'] > 0.6) & (final['平均涨跌_val'] > 0.6) & (final['红盘率_val'] >75) 
+        (final['资金增量_亿'] > 0.3) & (final['平均涨跌_val'] > 0)
     ]
     
     final = final.rename(columns={
