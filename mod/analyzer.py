@@ -257,7 +257,7 @@ def calculate_auto_concepts(df: pd.DataFrame) -> pd.DataFrame:
     final = concept_grp.merge(leaders[['题材名称', '增量先锋']], on='题材名称', how='left')
     final = final[
         (final['家数'] >= 4) & (final['家数'] <= 100) & 
-        (final['资金增量_亿'] > 0) & (final['平均涨跌_val'] > 0)
+        (final['资金增量_亿'] > 0.3) & (final['平均涨跌_val'] > 0)
     ]
     
     final = final.rename(columns={
@@ -267,75 +267,52 @@ def calculate_auto_concepts(df: pd.DataFrame) -> pd.DataFrame:
     return final.sort_values('资金增量(亿)', ascending=False)
     
 def calculate_auto(df: pd.DataFrame) -> pd.DataFrame:
-    """自动识别并计算题材共振数据（增加涨幅>9.8%家数条件）"""
-    if df.empty or '所属概念' not in df.columns: 
-        return pd.DataFrame()
+    """自动识别并计算题材共振数据"""
+    if df.empty or '所属概念' not in df.columns: return pd.DataFrame()
 
     df_c = df.copy()
     df_c['涨跌幅_num'] = pd.to_numeric(df_c['涨跌幅'], errors='coerce').fillna(0)
-    
-    # 合并概念与行业，并拆分
     df_c['tag_list'] = (df_c['所属概念'].fillna('') + ';' + df_c['所属行业'].fillna('')).str.replace('，', ';').str.split(';')
     
     exploded = df_c.explode('tag_list').rename(columns={'tag_list': '题材名称'})
     exploded = exploded[(~exploded['题材名称'].isin(BLACKLIST)) & (exploded['题材名称'].str.len() >= 2)]
-    if exploded.empty: 
-        return pd.DataFrame()
+    if exploded.empty: return pd.DataFrame()
 
-    # 新增：标记涨幅 > 9.8% 的股票
-    exploded['is_big_up'] = exploded['涨跌幅_num'] > 9.8
-
-    # 聚合基础数据
     concept_grp = exploded.groupby('题材名称').agg(
         家数=('股票代码', 'count'),
         红盘率_val=('涨跌幅_num', lambda x: (x > 0).mean() * 100),
         平均涨跌_val=('涨跌幅_num', 'mean'),
-        资金增量_亿=('增量(亿)', 'sum'),
-        big_up_count=('is_big_up', 'sum')  # 新增：涨幅>9.8%的家数
+        资金增量_亿=('增量(亿)', 'sum')
     )
 
-    # 计算 top2 资金增量占比
     exploded['rank'] = exploded.groupby('题材名称')['增量(亿)'].rank(ascending=False, method='first')
     top2_stats = exploded[exploded['rank'] <= 2].groupby('题材名称')['增量(亿)'].sum()
     concept_grp['top2_sum'] = top2_stats
     
-    # 判断状态
     concept_grp['状态'] = np.where(
         (concept_grp['top2_sum'] / concept_grp['资金增量_亿'].replace(0, 1) > 0.7),
         "单兵(抱团)", "板块(合力)"
     )
 
-    # 提取龙头股信息
     leaders = exploded[exploded['rank'] == 1].copy()
     leaders['增量先锋'] = (
         leaders['股票简称'] + "(" + leaders['涨跌幅'].astype(str) + "%) " + 
         "[" + leaders['结构标签'].fillna('--') + "]"
     )
 
-    # 合并龙头信息
     final = concept_grp.merge(leaders[['题材名称', '增量先锋']], on='题材名称', how='left')
-
-    # 最终筛选条件（已加入 big_up_count >= 1）
     final = final[
         ((final['家数'] >= 4) & (final['家数'] <= 1000) & 
-         (final['资金增量_亿'] < 0) & (final['平均涨跌_val'] < -3) & (final['big_up_count'] >= 1)) |
-        
-        ((final['家数'] >= 4) & (final['家数'] <= 1000) & 
-         (final['资金增量_亿'] > 0.5) & (final['平均涨跌_val'] < -3) & (final['big_up_count'] >= 1)) |
-        
-        ((final['家数'] >= 4) & (final['家数'] <= 1000) & 
-         (final['资金增量_亿'] > 0.6) & (final['平均涨跌_val'] > 0.6) & 
-         (final['红盘率_val'] > 75) & (final['big_up_count'] >= 1))
+        (final['资金增量_亿'] <0) & (final['平均涨跌_val'] <-3)) | ((final['家数'] >= 4) & (final['家数'] <= 1000) & 
+        (final['资金增量_亿'] >0.5) & (final['平均涨跌_val'] <-3)) | ((final['家数'] >= 4) & (final['家数'] <= 1000) & 
+        (final['资金增量_亿'] >0.6) & (final['平均涨跌_val'] >0.6) & (final['红盘率_val'] >75))
     ]
     
-    # 重命名列
     final = final.rename(columns={
-        '红盘率_val': '红盘率%', 
-        '平均涨跌_val': '平均涨跌%', 
-        '资金增量_亿': '资金增量(亿)'
+        '红盘率_val': '红盘率%', '平均涨跌_val': '平均涨跌%', '资金增量_亿': '资金增量(亿)'
     })
     
-    # 按资金增量降序排列
+    # 修改这里：将ascending改为True，按增序排列
     return final.sort_values('资金增量(亿)', ascending=False)
 
 
