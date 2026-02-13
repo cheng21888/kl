@@ -52,10 +52,10 @@ def report_top_stocks(df: pd.DataFrame):
     print("\n## 3. 个股竞价异动穿透")
     top_inc = df.nlargest(10, '增量(亿)')
     print_md_table(top_inc[['股票简称', '涨跌幅', '增量(亿)', '结构标签', '热点标签']], 
-                   "3.1 竞价增量 Top 15", "资金流入最显著的个股")
+                   "3.1 竞价增量 Top 12", "资金流入最显著的个股")
     top_dec = df.nsmallest(10, '增量(亿)')
     print_md_table(top_dec[['股票简称', '涨跌幅', '增量(亿)', '结构标签', '热点标签']], 
-                   "3.2 竞价减量 Top 15", "资金流出最显著的个股")
+                   "3.2 竞价减量 Top 12", "资金流出最显著的个股")
 
 
 def report_sector_flow(df: pd.DataFrame, total_abs: float):
