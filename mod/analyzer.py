@@ -305,7 +305,7 @@ def calculate_auto(df: pd.DataFrame) -> pd.DataFrame:
         ((final['家数'] >= 4) & (final['家数'] <= 1000) & 
         (final['资金增量_亿'] <0) & (final['平均涨跌_val'] <-3)) | ((final['家数'] >= 4) & (final['家数'] <= 1000) & 
         (final['资金增量_亿'] >0.5) & (final['平均涨跌_val'] <-3)) | ((final['家数'] >= 4) & (final['家数'] <= 1000) & 
-        (final['资金增量_亿'] >0.6) & (final['平均涨跌_val'] >0.6) & (final['红盘率_val'] >75))
+        (final['资金增量_亿'] >2) & (final['平均涨跌_val'] >0.8) & (final['红盘率_val'] >66))
     ]
     
     final = final.rename(columns={
