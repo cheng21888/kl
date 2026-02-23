@@ -174,3 +174,83 @@ def report_zt_stocks(today_date: datetime, prev_date: datetime, df_zt: pd.DataFr
     final_show = [c for c in show_cols if c in df_display.columns]
     
     print_md_table(df_display[final_show], "竞价涨停列表 (按封单额降序)")
+    
+def report_zf_stocks(today_date: datetime, prev_date: datetime, df_zt: pd.DataFrame) -> None:
+    """ 输出报告 - 适配新的数据结构 """
+    print(f"\n# 🎯 竞价强势股分析 ({today_date.strftime('%Y-%m-%d')})")
+    
+    if df_zt.empty:
+        print("\n**没有符合条件的股票**")
+        return
+    
+    # 1. 统计信息
+    total_count = len(df_zt)
+    zt_count = len(df_zt[df_zt['是否竞价涨停'] == True]) if '是否竞价涨停' in df_zt.columns else 0
+    cm20_count = len(df_zt[df_zt['涨跌幅'] > 19]) if '涨跌幅' in df_zt.columns else 0
+    avg_ratio = df_zt['竞价放量倍数'].mean() if '竞价放量倍数' in df_zt.columns else 0
+    total_amt = df_zt['竞价金额'].sum() / 1e8 if '竞价金额' in df_zt.columns else 0
+    
+    print(f"\n**筛选条件**: 连板天数≥2 | 竞价放量≥1倍 | 今日涨幅>昨日涨幅")
+    print(f"\n**符合条件总数**: {total_count} 只")
+    print(f"  ├─ 竞价涨停: {zt_count} 只")
+    print(f"  ├─ 20CM股票: {cm20_count} 只")
+    print(f"  ├─ 平均放量倍数: {avg_ratio:.2f}倍")
+    print(f"  └─ 合计竞价金额: {total_amt:.2f}亿")
+    
+    # 2. 连板分布统计
+    if '连板天数' in df_zt.columns:
+        print(f"\n**连板分布**:")
+        for board in sorted(df_zt['连板天数'].unique()):
+            count = len(df_zt[df_zt['连板天数'] == board])
+            print(f"  ├─ {board}: {count} 只")
+    
+    # 3. 详情表
+    df_display = df_zt.copy()
+    
+    # 按竞价金额排序
+    df_display = df_display.sort_values('竞价金额', ascending=False)
+    
+    # 格式化显示列
+    if '竞价金额' in df_display.columns:
+        df_display['竞价金额(万)'] = (df_display['竞价金额'] / 10000).round(0).astype(int)
+    
+    if '竞价放量倍数' in df_display.columns:
+        df_display['放量'] = df_display['竞价放量倍数'].map(lambda x: f"{x:.2f}倍")
+    
+    if '涨跌幅' in df_display.columns:
+        df_display['涨幅%'] = df_display['涨跌幅'].map(lambda x: f"{x:.2f}%")
+    
+    # 涨停标识
+    if '是否竞价涨停' in df_display.columns:
+        df_display['涨停'] = df_display['是否竞价涨停'].map({True: "✅", False: ""})
+    
+    # 选择要显示的列
+    show_cols = [
+        '股票简称', '涨幅%', '连板天数', '放量', '竞价金额(万)', 
+        '涨停', '所属行业', '热点关键词', '流通市值(亿)'
+    ]
+    final_show = [c for c in show_cols if c in df_display.columns]
+    
+    print_md_table(df_display[final_show].head(20), "强势连板股列表 (按竞价金额降序, 前20只)")
+    
+    # 4. 如果有涨停股票，单独展示涨停列表
+    if zt_count > 0 and '是否竞价涨停' in df_display.columns:
+        df_zt_only = df_display[df_display['是否竞价涨停'] == True].copy()
+        if not df_zt_only.empty:
+            print_md_table(df_zt_only[final_show], f"竞价涨停股 ({len(df_zt_only)}只)")
+    
+    # 5. 热点关键词统计
+    if '热点关键词' in df_display.columns:
+        from collections import Counter
+        import re
+        
+        all_keywords = []
+        for keywords in df_display['热点关键词'].dropna():
+            if keywords:
+                all_keywords.extend([k.strip() for k in keywords.split(',') if k.strip()])
+        
+        if all_keywords:
+            keyword_stats = Counter(all_keywords).most_common(5)
+            print(f"\n**热点关键词 TOP5**:")
+            for keyword, count in keyword_stats:
+                print(f"  ├─ {keyword}: {count} 只")
