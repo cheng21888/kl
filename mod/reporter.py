@@ -208,7 +208,7 @@ def report_zf_stocks(today_date: datetime, prev_date: datetime, df_zt: pd.DataFr
     df_display = df_zt.copy()
     
     # 按竞价金额排序
-    df_display = df_display.sort_values('竞价金额', ascending=False)
+    df_display = df_display.sort_values('竞价金额_今', ascending=False)
     
     # 格式化显示列
     if '竞价金额' in df_display.columns:
