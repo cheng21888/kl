@@ -384,101 +384,125 @@ def build_zt_tags(today_date: datetime, prev_date: datetime) -> pd.DataFrame:
     
     
 def build_zf_tags(today_date: datetime, prev_date: datetime) -> pd.DataFrame:
-    """ 构建涨停标签分析表 - 金额单位：亿元 """
+    """构建涨停标签分析表 - 基于连板加速和超跌反弹条件"""
     # 1. 读取数据
     df_today = read_market_data(today_date, '竞价行情')
-    df_yest = read_market_data(prev_date, '竞价行情')
-    df_limit = read_market_data(prev_date, '收盘涨跌停')
+    df_yest_close = read_market_data(prev_date, '收盘行情')
+    df_yest_jingjia = read_market_data(prev_date, '竞价行情')
     df_concept = load_concept_data()
+    df_limit = read_market_data(prev_date, '收盘涨跌停')
     
-    if df_today.empty or df_yest.empty:
+    if df_today.empty or df_yest_close.empty or df_yest_jingjia.empty:
         return pd.DataFrame()
 
-    # 2. 数值类型转换
-    numeric_check = ['涨停价', '竞价价', '涨跌幅', '竞价金额']
+    # 2. 数据预处理
+    numeric_check = ['涨停价', '竞价价', '买一价', '买一量', '卖一价', '卖一量', '流通市值', '涨跌幅']
     for col in numeric_check:
         if col in df_today.columns:
             df_today[col] = pd.to_numeric(df_today[col], errors='coerce').fillna(0)
     
-    # 3. 使用所有股票，不筛选涨停
-    df_zt = df_today.copy()
+    # 处理昨日收盘数据
+    df_yest_close['涨跌幅'] = pd.to_numeric(df_yest_close['涨跌幅'], errors='coerce').fillna(0)
     
-    if df_zt.empty:
-        return pd.DataFrame()
+    # 处理昨日竞价数据
+    df_yest_jingjia['竞价金额'] = pd.to_numeric(df_yest_jingjia['竞价金额'], errors='coerce').fillna(0)
     
-    # 4. 添加昨日竞价数据
-    df_zt = df_zt.merge(df_yest[['股票代码', '竞价金额', '涨跌幅']], 
-                        on='股票代码', 
-                        suffixes=('', '_昨'), 
-                        how='left')
+    # 3. 基础数据合并
+    df = df_today[['股票代码', '股票简称', '涨跌幅', '竞价金额', '竞价价', '涨停价']].copy()
     
-    # 5. 添加连板数据
+    # 合并昨日收盘数据
+    df = df.merge(df_yest_close[['股票代码', '涨跌幅']], on='股票代码', 
+                  suffixes=('_今', '_昨收'), how='left')
+    
+    # 合并昨日竞价数据
+    df = df.merge(df_yest_jingjia[['股票代码', '竞价金额']], on='股票代码', 
+                  suffixes=('', '_昨竞价'), how='left')
+    df = df.rename(columns={'竞价金额': '竞价金额_今', '竞价金额_昨竞价': '竞价金额_昨'})
+    
+    # 合并连板数据
     if not df_limit.empty:
-        df_limit = clean_dataframe(df_limit)
-        df_zt = df_zt.merge(df_limit[['股票代码', '连续涨停天数']],
-                            on='股票代码', 
-                            how='left')
+        df = df.merge(df_limit[['股票代码', '连续涨停天数']], on='股票代码', how='left')
+    df['连续涨停天数'] = pd.to_numeric(df['连续涨停天数'], errors='coerce').fillna(0).astype(int)
     
-    # 6. 计算竞价放量倍数
-    df_zt['竞价金额_昨'] = df_zt['竞价金额_昨'].fillna(1e6)  # 避免除0
-    df_zt['竞价放量倍数'] = df_zt['竞价金额'] / df_zt['竞价金额_昨']
+    # 填充空值
+    df['竞价金额_昨'] = df['竞价金额_昨'].fillna(0)
+    df['涨跌幅_昨收'] = df['涨跌幅_昨收'].fillna(0)
     
-    # 7. 处理缺失的连续涨停天数
-    df_zt['连续涨停天数'] = pd.to_numeric(df_zt['连续涨停天数'], errors='coerce').fillna(0).astype(int)
-    
-    # 8. 应用筛选条件：
-    #    - days >= 2 (连续涨停天数大于等于2)
-    #    - ratio >= 1 (竞价放量倍数大于等于1)
-    #    - 今日竞价涨跌幅 > 昨日竞价涨跌幅
-    condition = (
-        (df_zt['连续涨停天数'] >= 2) & 
-        (df_zt['竞价放量倍数'] >= 1) & 
-        (df_zt['涨跌幅'] > df_zt['涨跌幅_昨'].fillna(-100))  # 昨日涨跌幅为空时默认-100
+    # 4. 计算条件指标
+    # 竞价放量倍数（今日竞价金额 / 昨日竞价金额）
+    df['竞价放量倍数'] = df.apply(
+        lambda row: row['竞价金额_今'] / row['竞价金额_昨'] if row['竞价金额_昨'] > 0 else 0, 
+        axis=1
     )
     
-    df_zt = df_zt[condition].copy()
+    # 5. 应用筛选条件
+    # 条件1: 连板天数 >= 2 AND 竞价放量倍数 >= 1 AND 今日竞价涨跌幅 > 昨日收盘涨跌幅
+    condition1 = (
+        (df['连续涨停天数'] >= 2) & 
+        (df['竞价放量倍数'] >= 1) & 
+        (df['涨跌幅_今'] > df['涨跌幅_昨收'])
+    )
     
-    if df_zt.empty:
+    # 条件2: 昨日收盘涨跌幅 < -5% 且 > -9.8% AND 今日竞价成交额 > 昨日竞价成交额
+    condition2 = (
+        (df['涨跌幅_昨收'] < -5) & 
+        (df['涨跌幅_昨收'] > -9.8) & 
+        (df['竞价金额_今'] > df['竞价金额_昨'])
+    )
+    
+    # 合并条件
+    df_filtered = df[condition1 | condition2].copy()
+    
+    if df_filtered.empty:
         return pd.DataFrame()
     
-    # 9. 合并概念、行业及历史涨停原因
+    # 6. 计算封单金额（亿元）
+    has_valid_sell = (df_filtered['卖一价'] > 0) & (df_filtered['卖一量'] > 0)
+    df_filtered['封单额(亿)'] = np.where(
+        has_valid_sell,
+        -df_filtered['卖一价'] * df_filtered['卖一量'] / 100000000,  # 压单为负
+        df_filtered['买一价'] * df_filtered['买一量'] / 100000000    # 封单为正
+    )
+    
+    # 7. 添加标签说明
+    df_filtered['筛选条件'] = np.select(
+        [condition1, condition2],
+        ['连板加速', '超跌反弹'],
+        default='其他'
+    )
+    
+    # 8. 合并概念数据
     if not df_concept.empty:
-        # 统一代码格式
         c_code = 'code' if 'code' in df_concept.columns else '股票代码'
         df_concept[c_code] = df_concept[c_code].apply(standardize_code)
-        # 选取的辅助分析列
         merge_cols = [c_code, '所属概念', '所属行业', '历史涨停原因类别']
         merge_cols = [c for c in merge_cols if c in df_concept.columns]
         
-        df_zt = pd.merge(df_zt, df_concept[merge_cols], left_on='股票代码', right_on=c_code, how='left')
+        df_filtered = pd.merge(df_filtered, df_concept[merge_cols], 
+                              left_on='股票代码', right_on=c_code, how='left')
         
         # 匹配热点关键词
-        df_zt['热点关键词'] = ""
-        if '所属概念' in df_zt.columns:
+        df_filtered['热点关键词'] = ""
+        if '所属概念' in df_filtered.columns:
             for keyword in HOT_KEYWORDS:
-                mask = df_zt['所属概念'].astype(str).str.contains(keyword, na=False)
-                df_zt.loc[mask, '热点关键词'] = df_zt.loc[mask, '热点关键词'].apply(
+                mask = df_filtered['所属概念'].astype(str).str.contains(keyword, na=False)
+                df_filtered.loc[mask, '热点关键词'] = df_filtered.loc[mask, '热点关键词'].apply(
                     lambda x: keyword if x == "" else f"{x},{keyword}"
                 )
     
-    # 10. 市值处理
-    if '流通市值' in df_zt.columns:
-        df_zt['流通市值(亿)'] = df_zt['流通市值']
-
-    # 11. 添加辅助分析列
-    df_zt['竞价放量倍数'] = df_zt['竞价放量倍数'].round(2)
-    df_zt['连板天数'] = df_zt['连续涨停天数'].astype(str) + "板"
+    # 9. 市值处理
+    if '流通市值' in df_filtered.columns:
+        df_filtered['流通市值(亿)'] = df_filtered['流通市值']
     
-    # 12. 添加涨停标识（可选，用于标记哪些是涨停的）
-    df_zt['是否竞价涨停'] = (abs(df_zt['涨停价'] - df_zt['竞价价']) < 0.01) & (df_zt['涨停价'] > 0)
-    
-    # 13. 整理输出列
+    # 10. 整理输出列
     output_cols = [
-        '股票代码', '股票简称', '涨跌幅', '涨跌幅_昨', '连板天数', 
-        '竞价放量倍数', '竞价金额', '竞价金额_昨', '是否竞价涨停',
-        '热点关键词', '所属行业', '流通市值(亿)', '历史涨停原因类别'
+        '股票代码', '股票简称', '涨跌幅_今', '竞价金额_今', '竞价金额_昨', 
+        '竞价放量倍数', '连续涨停天数', '涨跌幅_昨收', '筛选条件',
+        '封单额(亿)', '热点关键词', '所属行业', '流通市值(亿)', '历史涨停原因类别'
     ]
-    final_cols = [col for col in output_cols if col in df_zt.columns]
     
-    # 按竞价金额排序
-    return df_zt[final_cols].sort_values('竞价金额', ascending=False)
+    # 重命名涨跌幅列
+    df_filtered = df_filtered.rename(columns={'涨跌幅_今': '竞价涨跌幅%'})
+    
+    final_cols = [col for col in output_cols if col in df_filtered.columns]
+    return df_filtered[final_cols].sort_values('竞价金额_今', ascending=False)
