@@ -200,9 +200,6 @@ def report_special_conditions(today_date: datetime, prev_date: datetime, df: pd.
         how='left'
     )
     
-    # 获取涨停数据以获取连续涨停天数
-    df_limit = read_market_data(prev_date, '收盘涨跌停')
-    
     # 填充缺失值前确保列存在
     required_cols = {
         '昨日收盘涨跌幅': 0,
@@ -218,25 +215,38 @@ def report_special_conditions(today_date: datetime, prev_date: datetime, df: pd.
         else:
             df_analysis[col] = default_val
     
-    # 处理连续涨停天数
-    if not df_limit.empty:
-        # 清理数据
-        df_limit = df_limit.copy()
-        for col in df_limit.columns:
-            df_limit[col] = pd.to_numeric(df_limit[col], errors='coerce')
-        
-        # 合并连续涨停天数
-        df_analysis = df_analysis.merge(
-            df_limit[['股票代码', '连续涨停天数']],
-            on='股票代码',
-            how='left'
-        )
-    
-    # 确保连续涨停天数列存在并处理
-    if '连续涨停天数' not in df_analysis.columns:
-        df_analysis['连续涨停天数'] = 0
-    else:
+    # 处理连续涨停天数 - 从原始df中获取
+    if '连续涨停天数' in df_analysis.columns:
         df_analysis['连续涨停天数'] = pd.to_numeric(df_analysis['连续涨停天数'], errors='coerce').fillna(0)
+    else:
+        # 尝试从涨停数据中获取
+        df_limit = read_market_data(prev_date, '收盘涨跌停')
+        if not df_limit.empty:
+            # 检查df_limit中是否有连续涨停天数列
+            if '连续涨停天数' in df_limit.columns:
+                df_analysis = df_analysis.merge(
+                    df_limit[['股票代码', '连续涨停天数']],
+                    on='股票代码',
+                    how='left'
+                )
+                df_analysis['连续涨停天数'] = pd.to_numeric(df_analysis['连续涨停天数'], errors='coerce').fillna(0)
+            else:
+                # 如果没有连续涨停天数列，尝试其他可能的列名
+                possible_cols = ['连板天数', '涨停天数', '连板数']
+                for col in possible_cols:
+                    if col in df_limit.columns:
+                        df_analysis = df_analysis.merge(
+                            df_limit[['股票代码', col]].rename(columns={col: '连续涨停天数'}),
+                            on='股票代码',
+                            how='left'
+                        )
+                        df_analysis['连续涨停天数'] = pd.to_numeric(df_analysis['连续涨停天数'], errors='coerce').fillna(0)
+                        break
+                else:
+                    # 如果都没有，设置为0
+                    df_analysis['连续涨停天数'] = 0
+        else:
+            df_analysis['连续涨停天数'] = 0
     
     df_analysis['连续涨停天数'] = df_analysis['连续涨停天数'].astype(int)
     
@@ -278,8 +288,13 @@ def report_special_conditions(today_date: datetime, prev_date: datetime, df: pd.
     
     # 按条件分类并排序
     df_filtered['筛选条件'] = '其他'
-    df_filtered.loc[cond1[df_filtered.index], '筛选条件'] = '连板放量高开'
-    df_filtered.loc[cond2[df_filtered.index], '筛选条件'] = '大跌后竞价放量'
+    
+    # 正确索引条件
+    cond1_indices = df_filtered.index[cond1[df_filtered.index]]
+    cond2_indices = df_filtered.index[cond2[df_filtered.index]]
+    
+    df_filtered.loc[cond1_indices, '筛选条件'] = '连板放量高开'
+    df_filtered.loc[cond2_indices, '筛选条件'] = '大跌后竞价放量'
     
     # 按竞价金额降序排序
     df_filtered = df_filtered.sort_values('竞价金额_今', ascending=False)
