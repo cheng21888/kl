@@ -207,6 +207,7 @@ def report_special_conditions(today_date: datetime, prev_date: datetime, df: pd.
         on='股票代码',
         how='left'
     )
+    df_analysis['连续涨停天数'] = df_analysis['连续涨停天数'].astype(int)
     
     # 条件1：连板股放量高开
     cond1 = (
