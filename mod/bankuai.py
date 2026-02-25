@@ -201,6 +201,27 @@ def report_special_conditions(today_date: datetime, prev_date: datetime, df: pd.
         on='股票代码',
         how='left'
     )
+        # 合并昨日涨停数据（用于成交额对比）
+    df_analysis = df_analysis.merge(
+        df_yest_auction[['股票代码', '连续涨停天数']].rename(columns={'连续涨停天数': '连续涨停天数'}),
+        on='股票代码',
+        how='left'
+    )
+    # 填充缺失值前确保列存在
+    required_cols = {
+        '昨日收盘涨跌幅': 0,
+        '昨日竞价成交额': 1e6,
+        '连续涨停天数': 0,
+        '竞价金额_今': 0,
+        '涨跌幅': 0,
+    }
+    for col, default_val in required_cols.items():
+        if col in df_analysis.columns:
+            df_analysis[col] = pd.to_numeric(df_analysis[col], errors='coerce').fillna(default_val)
+        else:
+            df_analysis[col] = default_val
+    
+    df_analysis['连续涨停天数'] = df_analysis['连续涨停天数'].astype(int)
     
     
     # 条件1：连板股放量高开
@@ -510,4 +531,3 @@ def bankuai_tab(selected_date=None, prev_date=None):
 if __name__ == "__main__":
     st.set_page_config(layout="wide")
     bankuai_tab()
-
