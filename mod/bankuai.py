@@ -178,8 +178,10 @@ def report_special_conditions(today_date: datetime, prev_date: datetime, df: pd.
     # 获取昨日收盘数据
     df_close = read_market_data(prev_date, '收盘行情')
     df_yest_auction = read_market_data(prev_date, '竞价行情')
+    df_limit = read_market_data(prev_date, '收盘涨跌停')
+
     
-    if df_close.empty or df_yest_auction.empty:
+    if df_close.empty or df_yest_auction.empty or df_limit.empty:
         print("⚠️ 无法获取昨日收盘数据或昨日竞价数据")
         return pd.DataFrame()
     
@@ -199,10 +201,16 @@ def report_special_conditions(today_date: datetime, prev_date: datetime, df: pd.
         on='股票代码',
         how='left'
     )
+    # 合并昨日张跌停数据（用于成交额对比）
+    df_analysis = df_analysis.merge(
+        df_yest_auction[['股票代码', '连续涨停天数']].rename(columns={'连续涨停天数': '连续涨停天数'}),
+        on='股票代码',
+        how='left'
+    )
     
     # 条件1：连板股放量高开
     cond1 = (
-        (df_analysis['days'] >= 2) &
+        (df_analysis['连续涨停天数'] >= 2) &
         (df_analysis['竞价金额_今'] > df_analysis['昨日竞价成交额']) &
         (df_analysis['涨跌幅'] > df_analysis['昨日收盘涨跌幅'])
     )
