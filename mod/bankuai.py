@@ -165,10 +165,9 @@ def report_7pct_stocks(today_date: datetime, prev_date: datetime, df_7pct: pd.Da
 def report_special_conditions(today_date: datetime, prev_date: datetime, df: pd.DataFrame) -> pd.DataFrame:
     """
     筛选满足特定条件的股票并生成表格
-    修复点：
-    1. 修正连板数据的读取日期（读今日，因为存储的是昨日收盘结果）
-    2. 统一股票代码格式（去除前缀/后缀，只保留6位数字）
-    3. 优化条件判断逻辑，避免索引错误
+    条件：
+    1. 连续涨停天数 >= 2，竞价放量倍数 >= 1，今日竞价涨幅 > 昨日收盘涨跌幅
+    2. 或者：昨日收盘涨跌幅在 -9.8% 到 -5% 之间，且今日竞价成交额 > 昨日竞价成交额
     """
     print(f"\n# 🎯 特殊条件筛选分析 ({today_date.strftime('%Y-%m-%d')})")
     
@@ -176,162 +175,147 @@ def report_special_conditions(today_date: datetime, prev_date: datetime, df: pd.
         print("⚠️ 无有效数据")
         return pd.DataFrame()
     
-    # ---------------------- 修复Bug 1：读取今日的涨跌停数据（包含昨日连板结果） ----------------------
-    df_close = read_market_data(prev_date, '收盘行情')  # 昨日收盘涨跌幅
-    df_yest_auction = read_market_data(prev_date, '竞价行情')  # 昨日竞价金额
-    df_limit = read_market_data(today_date, '收盘涨跌停')  # 关键修复：读今日，获取昨日连板数据
+    # 获取昨日收盘数据
+    df_close = read_market_data(prev_date, '收盘行情')
+    df_yest_auction = read_market_data(prev_date, '竞价行情')
+    df_limit = read_market_data(prev_date, '收盘涨跌停')
 
+    
     if df_close.empty or df_yest_auction.empty or df_limit.empty:
-        print(f"⚠️ 数据缺失 - 收盘:{df_close.empty} 竞价:{df_yest_auction.empty} 涨跌停:{df_limit.empty}")
+        print("⚠️ 无法获取昨日收盘数据或昨日竞价数据")
         return pd.DataFrame()
     
     # 准备数据
     df_analysis = df.copy()
     
-    # ---------------------- 修复Bug 2：统一股票代码为6位数字，解决匹配失败 ----------------------
-    def normalize_code(code: str) -> str:
-        """统一代码为6位数字"""
-        if pd.isna(code):
-            return ""
-        # 处理 sh688125 -> 688125 或 688125.SH -> 688125
-        code = str(code).replace('sh', '').replace('sz', '').split('.')[0]
-        return code.zfill(6)  # 确保6位
-    
-    # 对所有涉及合并的DataFrame统一代码
-    for tmp_df in [df_analysis, df_close, df_yest_auction, df_limit]:
-        tmp_df['股票代码_6位'] = tmp_df['股票代码'].apply(normalize_code)
-    
-    # 合并数据（使用新的6位代码列）
+    # 合并昨日收盘数据（涨跌幅）
     df_analysis = df_analysis.merge(
-        df_close[['股票代码_6位', '涨跌幅']].rename(columns={'涨跌幅': '昨日收盘涨跌幅'}),
-        on='股票代码_6位',
+        df_close[['股票代码', '涨跌幅']].rename(columns={'涨跌幅': '昨日收盘涨跌幅'}),
+        on='股票代码',
         how='left'
     )
     
+    # 合并昨日竞价数据（用于成交额对比）
     df_analysis = df_analysis.merge(
-        df_yest_auction[['股票代码_6位', '竞价金额']].rename(columns={'竞价金额': '昨日竞价成交额'}),
-        on='股票代码_6位',
+        df_yest_auction[['股票代码', '竞价金额']].rename(columns={'竞价金额': '昨日竞价成交额'}),
+        on='股票代码',
         how='left'
     )
     
+    # ========== 关键修复：合并涨停数据 ==========
+    # 从收盘涨跌停表中合并连续涨停天数
     df_analysis = df_analysis.merge(
-        df_limit[['股票代码_6位', '连续涨停天数']],
-        on='股票代码_6位',
+        df_limit[['股票代码', '连续涨停天数']],  # 直接使用正确的列名
+        on='股票代码',
         how='left'
     )
+    # ========== 修复结束 ==========
     
-    # 填充缺失值
+    # 填充缺失值前确保列存在
     required_cols = {
-        '昨日收盘涨跌幅': 0.0,
+        '昨日收盘涨跌幅': 0,
         '昨日竞价成交额': 1e6,
         '连续涨停天数': 0,
-        '竞价金额_今': 0.0,
-        '涨跌幅': 0.0
+        '竞价金额_今': 0,
+        '涨跌幅': 0,
     }
+    
     for col, default_val in required_cols.items():
-        df_analysis[col] = pd.to_numeric(df_analysis[col], errors='coerce').fillna(default_val)
+        if col in df_analysis.columns:
+            df_analysis[col] = pd.to_numeric(df_analysis[col], errors='coerce').fillna(default_val)
+        else:
+            df_analysis[col] = default_val
     
     df_analysis['连续涨停天数'] = df_analysis['连续涨停天数'].astype(int)
-
-    # ---------------------- 核心筛选条件（逻辑不变，变量名优化） ----------------------
-    # 条件1：连板股放量高开 (连续涨停>=2 + 今日竞价>昨日竞价 + 今日涨幅>昨日涨幅)
+    
+    # 条件1：连板股放量高开（连续涨停天数 >= 2）
     cond1 = (
         (df_analysis['连续涨停天数'] >= 2) &
         (df_analysis['竞价金额_今'] > df_analysis['昨日竞价成交额']) &
         (df_analysis['涨跌幅'] > df_analysis['昨日收盘涨跌幅'])
     )
     
-    # 条件2：大跌后竞价放量
+    # 条件2：大跌后竞价放量（昨日收盘涨跌幅在-9.8%到-5%之间）
     cond2 = (
         (df_analysis['昨日收盘涨跌幅'] > -9.8) &
         (df_analysis['昨日收盘涨跌幅'] < -5) &
         (df_analysis['竞价金额_今'] > df_analysis['昨日竞价成交额'])
     )
     
-    # 筛选结果
+    # 合并两个条件
     df_filtered = df_analysis[cond1 | cond2].copy()
     
     if df_filtered.empty:
         print("⚠️ 没有股票满足筛选条件")
-        # 调试：打印连板股情况，确认数据是否读取成功
-        test_cond = df_analysis['连续涨停天数'] >= 2
-        print(f"📌 调试：连续涨停>=2的股票数量: {test_cond.sum()}")
-        if test_cond.sum() > 0:
-            print(df_analysis[test_cond][['股票简称', '连续涨停天数', '竞价金额_今', '昨日竞价成交额']])
         return pd.DataFrame()
     
-    # ---------------------- 修复Bug 3：基于筛选后的数据重新判断条件，避免索引错误 ----------------------
-    # 重新在筛选后的数据上计算条件（最安全的方式）
-    df_filtered['筛选条件'] = '其他'
-    df_filtered.loc[
-        (df_filtered['连续涨停天数'] >= 2) &
-        (df_filtered['竞价金额_今'] > df_filtered['昨日竞价成交额']) &
-        (df_filtered['涨跌幅'] > df_filtered['昨日收盘涨跌幅']),
-        '筛选条件'
-    ] = '连板放量高开'
-    
-    df_filtered.loc[
-        (df_filtered['昨日收盘涨跌幅'] > -9.8) &
-        (df_filtered['昨日收盘涨跌幅'] < -5) &
-        (df_filtered['竞价金额_今'] > df_filtered['昨日竞价成交额']),
-        '筛选条件'
-    ] = '大跌后竞价放量'
-
     # 统计信息
     total_count = len(df_filtered)
-    cond1_count = len(df_filtered[df_filtered['筛选条件'] == '连板放量高开'])
-    cond2_count = len(df_filtered[df_filtered['筛选条件'] == '大跌后竞价放量'])
+    cond1_count = len(df_analysis[cond1])
+    cond2_count = len(df_analysis[cond2])
     
     print(f"\n**满足条件总数**: {total_count} 只")
     print(f"- 条件1(连板放量高开): {cond1_count} 只")
     print(f"- 条件2(大跌后竞价放量): {cond2_count} 只")
     
-    # 后续格式化和展示逻辑（保持不变）
+    # 竞价金额统计
     if '竞价金额_今' in df_filtered.columns:
         avg_amt = (df_filtered['竞价金额_今'].mean() / 1e8).round(4)
         max_amt = (df_filtered['竞价金额_今'].max() / 1e8).round(4)
         print(f"\n**竞价金额统计**: 平均 {avg_amt} 亿 | 最高 {max_amt} 亿")
     
+    # 按条件分类并排序
+    df_filtered['筛选条件'] = '其他'
+    df_filtered.loc[cond1[df_filtered.index], '筛选条件'] = '连板放量高开'
+    df_filtered.loc[cond2[df_filtered.index], '筛选条件'] = '大跌后竞价放量'
+    
+    # 按竞价金额降序排序
     df_filtered = df_filtered.sort_values('竞价金额_今', ascending=False)
+    
+    # 准备展示数据
     df_display = df_filtered.copy()
     
+    # 转换金额单位为亿
     if '竞价金额_今' in df_display.columns:
         df_display['竞价金额(亿)'] = (df_display['竞价金额_今'] / 1e8).round(4)
+    
     if '昨日竞价成交额' in df_display.columns:
         df_display['昨日竞价(亿)'] = (df_display['昨日竞价成交额'] / 1e8).round(4)
-    if '涨跌幅' in df_display.columns:
-        df_display['涨跌幅%'] = df_display['涨跌幅'].round(2)
-    if '昨日收盘涨跌幅' in df_display.columns:
-        df_display['昨日收盘%'] = df_display['昨日收盘涨跌幅'].round(2)
     
-    # 定义展示列（移除6位代码，显示原始代码）
+    # 格式化涨跌幅显示
+    df_display['涨跌幅%'] = df_display['涨跌幅'].round(2)
+    df_display['昨日收盘%'] = df_display['昨日收盘涨跌幅'].round(2)
+    
+    # 定义展示列
     show_cols = [
-        '股票代码', '股票简称', '筛选条件', '涨跌幅%', '昨日收盘%', 
+        '股票简称', '筛选条件', '涨跌幅%', '昨日收盘%', 
         '竞价金额(亿)', '昨日竞价(亿)', '所属行业', '流通市值(亿)', 
-        '结构标签', '热点标签'
+        '结构标签', '热点标签', '连续涨停天数'  # 可以加上这一列用于验证
     ]
     final_show = [c for c in show_cols if c in df_display.columns]
     
+    # 输出markdown表格
     print("\n### 📋 筛选结果详情")
     if final_show:
         print(pd.DataFrame(df_display[final_show]).to_markdown(index=False))
+    else:
+        print("⚠️ 没有可显示的列")
     
-    # 分组统计
-    if '筛选条件' in df_filtered.columns:
+    # 按条件分组统计
+    if '筛选条件' in df_filtered.columns and len(df_filtered['筛选条件'].unique()) > 0:
         print("\n### 📊 按条件分组统计")
         group_stats = df_filtered.groupby('筛选条件').agg({
             '股票代码': 'count',
-            '竞价金额_今': lambda x: (x.sum() / 1e8).round(2),
+            '竞价金额_今': lambda x: (x.sum() / 1e8).round(2) if x.sum() > 0 else 0,
             '涨跌幅': 'mean'
         }).round(2)
         group_stats.columns = ['股票数量', '总竞价金额(亿)', '平均涨幅%']
         print(group_stats.to_markdown())
     
-    # 行业关键词分析
+    # 分析行业关键词
     analyze_single_table_keywords(df_filtered, "特殊条件筛选", top_n=5)
     
     return df_filtered
-
 
 
 def highlight_6_2(row):
