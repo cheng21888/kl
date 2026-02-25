@@ -171,11 +171,38 @@ def report_special_conditions(today_date: datetime, prev_date: datetime, df: pd.
     """
     print(f"\n# 🎯 特殊条件筛选分析 ({today_date.strftime('%Y-%m-%d')})")
     
+    if df is None or df.empty:
+        print("⚠️ 无有效数据")
+        return pd.DataFrame()
     
+    # 获取昨日收盘数据
+    df_close = read_market_data(prev_date, '收盘行情')
+    df_yest_auction = read_market_data(prev_date, '竞价行情')
+    
+    if df_close.empty or df_yest_auction.empty:
+        print("⚠️ 无法获取昨日收盘数据或昨日竞价数据")
+        return pd.DataFrame()
+    
+    # 准备数据
+    df_analysis = df.copy()
+    
+    # 合并昨日收盘数据
+    df_analysis = df_analysis.merge(
+        df_close[['股票代码', '涨跌幅']].rename(columns={'涨跌幅': '昨日收盘涨跌幅'}),
+        on='股票代码',
+        how='left'
+    )
+    
+    # 合并昨日竞价数据（用于成交额对比）
+    df_analysis = df_analysis.merge(
+        df_yest_auction[['股票代码', '竞价金额']].rename(columns={'竞价金额': '昨日竞价成交额'}),
+        on='股票代码',
+        how='left'
+    )
     
     # 条件1：连板股放量高开
     cond1 = (
-        (df_analysis['连续涨停天数'] >= 2) &
+        (df_analysis['days'] >= 2) &
         (df_analysis['竞价金额_今'] > df_analysis['昨日竞价成交额']) &
         (df_analysis['涨跌幅'] > df_analysis['昨日收盘涨跌幅'])
     )
@@ -239,8 +266,7 @@ def report_special_conditions(today_date: datetime, prev_date: datetime, df: pd.
     # 定义展示列
     show_cols = [
         '股票简称', '筛选条件', '涨跌幅%', '昨日收盘%', 
-        '竞价金额(亿)', '昨日竞价(亿)', '竞价放量倍数',
-        '连续涨停天数', '所属行业', '流通市值(亿)', 
+        '竞价金额(亿)', '昨日竞价(亿)',  '所属行业', '流通市值(亿)', 
         '结构标签', '热点标签'
     ]
     final_show = [c for c in show_cols if c in df_display.columns]
@@ -432,7 +458,7 @@ def bankuai_tab(selected_date=None, prev_date=None):
                 # 选择要显示的列
                 display_cols = [
                     '股票简称', '筛选条件', '涨跌幅%', '昨日收盘%',
-                    '竞价金额(亿)', '昨日竞价(亿)', '连续涨停天数', '所属行业', '结构标签'
+                    '竞价金额(亿)', '昨日竞价(亿)', '所属行业', '结构标签'
                 ]
                 display_cols = [c for c in display_cols if c in df_special_display.columns]
                 
