@@ -203,7 +203,7 @@ def report_special_conditions(today_date: datetime, prev_date: datetime, df: pd.
     )
         # 合并昨日涨停数据（用于成交额对比）
     df_analysis = df_analysis.merge(
-        df_yest_auction[['股票代码', '连续涨停天数']].rename(columns={'连续涨停天数': '连续涨停天数'}),
+        df_limit[['股票代码', '连续涨停天数']].rename(columns={'连续涨停天数': '连续涨停天数'}),
         on='股票代码',
         how='left'
     )
@@ -531,3 +531,4 @@ def bankuai_tab(selected_date=None, prev_date=None):
 if __name__ == "__main__":
     st.set_page_config(layout="wide")
     bankuai_tab()
+
