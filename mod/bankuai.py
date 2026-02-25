@@ -186,20 +186,6 @@ def report_special_conditions(today_date: datetime, prev_date: datetime, df: pd.
     # 准备数据
     df_analysis = df.copy()
     
-    # 合并昨日收盘数据
-    df_analysis = df_analysis.merge(
-        df_close[['股票代码', '涨跌幅']].rename(columns={'涨跌幅': '昨日收盘涨跌幅'}),
-        on='股票代码',
-        how='left'
-    )
-    
-    # 合并昨日竞价数据（用于成交额对比）
-    df_analysis = df_analysis.merge(
-        df_yest_auction[['股票代码', '竞价金额']].rename(columns={'竞价金额': '昨日竞价成交额'}),
-        on='股票代码',
-        how='left'
-    )
-    
     # 填充缺失值前确保列存在
     required_cols = {
         '昨日收盘涨跌幅': 0,
@@ -559,3 +545,4 @@ def bankuai_tab(selected_date=None, prev_date=None):
 if __name__ == "__main__":
     st.set_page_config(layout="wide")
     bankuai_tab()
+
