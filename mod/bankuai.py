@@ -201,13 +201,7 @@ def report_special_conditions(today_date: datetime, prev_date: datetime, df: pd.
         on='股票代码',
         how='left'
     )
-    # 合并昨日张跌停数据（用于成交额对比）
-    df_analysis = df_analysis.merge(
-        df_limit[['股票代码', '连续涨停天数']].rename(columns={'连续涨停天数': '连续涨停天数'}),
-        on='股票代码',
-        how='left'
-    )
-    df_analysis['连续涨停天数'] = df_analysis['连续涨停天数'].astype(int)
+    
     
     # 条件1：连板股放量高开
     cond1 = (
@@ -516,3 +510,4 @@ def bankuai_tab(selected_date=None, prev_date=None):
 if __name__ == "__main__":
     st.set_page_config(layout="wide")
     bankuai_tab()
+
