@@ -179,7 +179,6 @@ def report_special_conditions(today_date: datetime, prev_date: datetime, df: pd.
     df_close = read_market_data(prev_date, '收盘行情')
     df_yest_auction = read_market_data(prev_date, '竞价行情')
     df_limit = read_market_data(prev_date, '收盘涨跌停')
-
     
     if df_close.empty or df_yest_auction.empty or df_limit.empty:
         print("⚠️ 无法获取昨日收盘数据或昨日竞价数据")
@@ -201,13 +200,15 @@ def report_special_conditions(today_date: datetime, prev_date: datetime, df: pd.
         on='股票代码',
         how='left'
     )
-        # 合并昨日涨停数据（用于成交额对比）
+    
+    # 合并昨日涨停数据 - 只合并一次，并明确列名
     df_analysis = df_analysis.merge(
-        df_limit[['股票代码', '连续涨停天数']].rename(columns={'连续涨停天数': '连续涨停天数'}),
+        df_limit[['股票代码', '连续涨停天数']],
         on='股票代码',
         how='left'
     )
-    # 填充缺失值前确保列存在
+    
+    # 确保需要的列都存在
     required_cols = {
         '昨日收盘涨跌幅': 0,
         '昨日竞价成交额': 1e6,
@@ -215,31 +216,37 @@ def report_special_conditions(today_date: datetime, prev_date: datetime, df: pd.
         '竞价金额_今': 0,
         '涨跌幅': 0,
     }
+    
     for col, default_val in required_cols.items():
         if col in df_analysis.columns:
             df_analysis[col] = pd.to_numeric(df_analysis[col], errors='coerce').fillna(default_val)
         else:
             df_analysis[col] = default_val
     
+    # 确保连续涨停天数是整数
     df_analysis['连续涨停天数'] = df_analysis['连续涨停天数'].astype(int)
     
+    # 计算竞价放量倍数
+    df_analysis['竞价放量倍数'] = df_analysis['竞价金额_今'] / df_analysis['昨日竞价成交额']
     
-    # 条件1：连板股放量高开
+    # 【修复关键】条件1：连板股放量高开
+    # 连续涨停天数 >= 2，放量倍数 >= 1，今日涨幅 > 昨日涨幅
     cond1 = (
-        (df_analysis['连续涨停天数'] >= 2) &
-        (df_analysis['竞价金额_今'] > df_analysis['昨日竞价成交额']) &
+        (df_analysis['连续涨停天数'] >= 2) & 
+        (df_analysis['竞价放量倍数'] >= 1) &  # 使用放量倍数而不是直接比较金额
         (df_analysis['涨跌幅'] > df_analysis['昨日收盘涨跌幅'])
     )
     
-    # 条件2：大跌后竞价放量
+    # 条件2：大跌后竞价放量（这个逻辑是正确的）
     cond2 = (
         (df_analysis['昨日收盘涨跌幅'] > -9.8) &
         (df_analysis['昨日收盘涨跌幅'] < -5) &
-        (df_analysis['竞价金额_今'] > df_analysis['昨日竞价成交额'])
+        (df_analysis['竞价放量倍数'] > 1)  # 使用放量倍数更直观
     )
     
     # 合并两个条件
-    df_filtered = df_analysis[cond1 | cond2].copy()
+    mask = cond1 | cond2
+    df_filtered = df_analysis[mask].copy()
     
     if df_filtered.empty:
         print("⚠️ 没有股票满足筛选条件")
@@ -247,12 +254,12 @@ def report_special_conditions(today_date: datetime, prev_date: datetime, df: pd.
     
     # 统计信息
     total_count = len(df_filtered)
-    cond1_count = len(df_analysis[cond1])
-    cond2_count = len(df_analysis[cond2])
+    cond1_count = cond1.sum()
+    cond2_count = cond2.sum()
     
     print(f"\n**满足条件总数**: {total_count} 只")
-    print(f"- 条件1(连板放量高开): {cond1_count} 只")
-    print(f"- 条件2(大跌后竞价放量): {cond2_count} 只")
+    print(f"- 条件1(连板放量高开 >=2板，放量>=1倍，高开>昨收): {cond1_count} 只")
+    print(f"- 条件2(大跌后竞价放量 -9.8% ~ -5%，放量>1倍): {cond2_count} 只")
     
     # 竞价金额统计
     if '竞价金额_今' in df_filtered.columns:
@@ -260,15 +267,10 @@ def report_special_conditions(today_date: datetime, prev_date: datetime, df: pd.
         max_amt = (df_filtered['竞价金额_今'].max() / 1e8).round(4)
         print(f"\n**竞价金额统计**: 平均 {avg_amt} 亿 | 最高 {max_amt} 亿")
     
-    # 按条件分类并排序
+    # 按条件分类
     df_filtered['筛选条件'] = '其他'
-    
-    # 正确索引条件
-    cond1_indices = df_filtered.index[cond1[df_filtered.index]]
-    cond2_indices = df_filtered.index[cond2[df_filtered.index]]
-    
-    df_filtered.loc[cond1_indices, '筛选条件'] = '连板放量高开'
-    df_filtered.loc[cond2_indices, '筛选条件'] = '大跌后竞价放量'
+    df_filtered.loc[cond1[df_filtered.index], '筛选条件'] = '连板放量高开'
+    df_filtered.loc[cond2[df_filtered.index], '筛选条件'] = '大跌后竞价放量'
     
     # 按竞价金额降序排序
     df_filtered = df_filtered.sort_values('竞价金额_今', ascending=False)
@@ -286,12 +288,13 @@ def report_special_conditions(today_date: datetime, prev_date: datetime, df: pd.
     # 格式化涨跌幅显示
     df_display['涨跌幅%'] = df_display['涨跌幅'].round(2)
     df_display['昨日收盘%'] = df_display['昨日收盘涨跌幅'].round(2)
+    df_display['放量倍数'] = df_display['竞价放量倍数'].round(2)
     
     # 定义展示列
     show_cols = [
-        '股票简称', '筛选条件', '涨跌幅%', '昨日收盘%', 
-        '竞价金额(亿)', '昨日竞价(亿)',  '所属行业', '流通市值(亿)', 
-        '结构标签', '热点标签'
+        '股票简称', '筛选条件', '涨跌幅%', '昨日收盘%', '放量倍数',
+        '竞价金额(亿)', '昨日竞价(亿)', '连续涨停天数', '所属行业', 
+        '流通市值(亿)', '结构标签', '热点标签'
     ]
     final_show = [c for c in show_cols if c in df_display.columns]
     
@@ -307,10 +310,11 @@ def report_special_conditions(today_date: datetime, prev_date: datetime, df: pd.
         print("\n### 📊 按条件分组统计")
         group_stats = df_filtered.groupby('筛选条件').agg({
             '股票代码': 'count',
-            '竞价金额_今': lambda x: (x.sum() / 1e8).round(2) if x.sum() > 0 else 0,
-            '涨跌幅': 'mean'
+            '竞价金额_今': lambda x: (x.sum() / 1e8).round(2),
+            '涨跌幅': 'mean',
+            '竞价放量倍数': 'mean'
         }).round(2)
-        group_stats.columns = ['股票数量', '总竞价金额(亿)', '平均涨幅%']
+        group_stats.columns = ['股票数量', '总竞价金额(亿)', '平均涨幅%', '平均放量倍数']
         print(group_stats.to_markdown())
     
     # 分析行业关键词
@@ -531,4 +535,3 @@ def bankuai_tab(selected_date=None, prev_date=None):
 if __name__ == "__main__":
     st.set_page_config(layout="wide")
     bankuai_tab()
-
