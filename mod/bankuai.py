@@ -203,14 +203,14 @@ def report_special_conditions(today_date: datetime, prev_date: datetime, df: pd.
     )
     # 合并昨日张跌停数据（用于成交额对比）
     df_analysis = df_analysis.merge(
-        df_yest_auction[['股票代码', '连续涨停天数']].rename(columns={'连续涨停天数': '连续涨停天数'}),
+        df_limit[['股票代码', '连续涨停天数']].rename(columns={'连续涨停天数': '涨停天数'}),
         on='股票代码',
         how='left'
     )
     
     # 条件1：连板股放量高开
     cond1 = (
-        (df_analysis['连续涨停天数'] >= 2) &
+        (df_analysis['涨停天数'] >= 2) &
         (df_analysis['竞价金额_今'] > df_analysis['昨日竞价成交额']) &
         (df_analysis['涨跌幅'] > df_analysis['昨日收盘涨跌幅'])
     )
