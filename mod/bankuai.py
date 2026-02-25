@@ -171,75 +171,12 @@ def report_special_conditions(today_date: datetime, prev_date: datetime, df: pd.
     """
     print(f"\n# 🎯 特殊条件筛选分析 ({today_date.strftime('%Y-%m-%d')})")
     
-    if df is None or df.empty:
-        print("⚠️ 无有效数据")
-        return pd.DataFrame()
     
-    # 获取昨日收盘数据
-    df_close = read_market_data(prev_date, '收盘行情')
-    df_yest_auction = read_market_data(prev_date, '竞价行情')
-    
-    if df_close.empty or df_yest_auction.empty:
-        print("⚠️ 无法获取昨日收盘数据或昨日竞价数据")
-        return pd.DataFrame()
-    
-    # 准备数据
-    df_analysis = df.copy()
-    
-    # 填充缺失值前确保列存在
-    required_cols = {
-        '昨日收盘涨跌幅': 0,
-        '昨日竞价成交额': 1e6,
-        '竞价放量倍数': 0,
-        '竞价金额_今': 0,
-        '涨跌幅': 0
-    }
-    
-    for col, default_val in required_cols.items():
-        if col in df_analysis.columns:
-            df_analysis[col] = pd.to_numeric(df_analysis[col], errors='coerce').fillna(default_val)
-        else:
-            df_analysis[col] = default_val
-    
-    # 处理连续涨停天数 - 从原始df中获取
-    if '连续涨停天数' in df_analysis.columns:
-        df_analysis['连续涨停天数'] = pd.to_numeric(df_analysis['连续涨停天数'], errors='coerce').fillna(0)
-    else:
-        # 尝试从涨停数据中获取
-        df_limit = read_market_data(prev_date, '收盘涨跌停')
-        if not df_limit.empty:
-            # 检查df_limit中是否有连续涨停天数列
-            if '连续涨停天数' in df_limit.columns:
-                df_analysis = df_analysis.merge(
-                    df_limit[['股票代码', '连续涨停天数']],
-                    on='股票代码',
-                    how='left'
-                )
-                df_analysis['连续涨停天数'] = pd.to_numeric(df_analysis['连续涨停天数'], errors='coerce').fillna(0)
-            else:
-                # 如果没有连续涨停天数列，尝试其他可能的列名
-                possible_cols = ['连板天数', '涨停天数', '连板数']
-                for col in possible_cols:
-                    if col in df_limit.columns:
-                        df_analysis = df_analysis.merge(
-                            df_limit[['股票代码', col]].rename(columns={col: '连续涨停天数'}),
-                            on='股票代码',
-                            how='left'
-                        )
-                        df_analysis['连续涨停天数'] = pd.to_numeric(df_analysis['连续涨停天数'], errors='coerce').fillna(0)
-                        break
-                else:
-                    # 如果都没有，设置为0
-                    df_analysis['连续涨停天数'] = 0
-        else:
-            df_analysis['连续涨停天数'] = 0
-    
-    df_analysis['连续涨停天数'] = df_analysis['连续涨停天数'].astype(int)
     
     # 条件1：连板股放量高开
     cond1 = (
         (df_analysis['连续涨停天数'] >= 2) &
-        (df_analysis['竞价放量倍数'] >= 1) &
+        (df_analysis['竞价金额_今'] > df_analysis['昨日竞价成交额']) &
         (df_analysis['涨跌幅'] > df_analysis['昨日收盘涨跌幅'])
     )
     
@@ -495,8 +432,7 @@ def bankuai_tab(selected_date=None, prev_date=None):
                 # 选择要显示的列
                 display_cols = [
                     '股票简称', '筛选条件', '涨跌幅%', '昨日收盘%',
-                    '竞价金额(亿)', '昨日竞价(亿)', '竞价放量倍数',
-                    '连续涨停天数', '所属行业', '结构标签'
+                    '竞价金额(亿)', '昨日竞价(亿)', '连续涨停天数', '所属行业', '结构标签'
                 ]
                 display_cols = [c for c in display_cols if c in df_special_display.columns]
                 
@@ -545,4 +481,3 @@ def bankuai_tab(selected_date=None, prev_date=None):
 if __name__ == "__main__":
     st.set_page_config(layout="wide")
     bankuai_tab()
-
