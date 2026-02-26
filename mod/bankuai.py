@@ -347,12 +347,16 @@ def report_continuous_limit_up_acceleration(today_date: datetime, prev_date: dat
     df_analysis['昨日竞价成交额'] = pd.to_numeric(df_analysis['昨日竞价成交额'], errors='coerce').fillna(0)
     df_analysis['涨跌幅'] = pd.to_numeric(df_analysis['涨跌幅'], errors='coerce').fillna(0)
     df_analysis['竞价金额_今'] = pd.to_numeric(df_analysis['竞价金额_今'], errors='coerce').fillna(0)
-    
+    倍数=df_analysis['竞价金额_今'] / df_analysis['昨日竞价成交额'])
     # 应用筛选条件
     condition = (
-        (df_analysis['连续涨停天数'] >= 2) &
+        ((df_analysis['连续涨停天数'] >= 2) &
         (df_analysis['涨跌幅'] > df_analysis['昨日竞价涨跌幅']) &
-        (df_analysis['竞价金额_今'] / df_analysis['昨日竞价成交额'])>0.7
+        (倍数>0.7) & (df_analysis['涨跌幅']>9) & (倍数<1)) | ((df_analysis['连续涨停天数'] >= 2) & (df_analysis['涨跌幅'] >9.8) & df_analysis['昨日竞价涨跌幅']>9.8) & (倍数>3)) | ((df_analysis['连续涨停天数'] >= 2) &
+(df_analysis['涨跌幅'] > df_analysis['昨日竞价涨跌幅']) &
+(倍数>0.7) & (df_analysis['涨跌幅']<6) & (倍数<1)) | ((df_analysis['连续涨停天数'] >= 2) & (df_analysis['涨跌幅'] > df_analysis['昨日竞价涨跌幅']) &
+(倍数>2) & (df_analysis['涨跌幅']>9) & (df_analysis['昨日竞价涨跌幅']>4)) |        ((df_analysis['连续涨停天数'] >= 2) &
+(df_analysis['涨跌幅'] >2 df_analysis['昨日竞价涨跌幅']>9.8) & (倍数>15) & (df_analysis['涨跌幅']<6))
     )
     
     df_filtered = df_analysis[condition].copy()
