@@ -352,11 +352,12 @@ def report_continuous_limit_up_acceleration(today_date: datetime, prev_date: dat
     condition = (
         ((df_analysis['连续涨停天数'] >= 2) &
         (df_analysis['涨跌幅'] > df_analysis['昨日竞价涨跌幅']) &
-        (倍数>0.7) & (df_analysis['涨跌幅']>9) & (倍数<1)) | ((df_analysis['连续涨停天数'] >= 2) & (df_analysis['涨跌幅'] >9.8) & df_analysis['昨日竞价涨跌幅']>9.8) & (倍数>3)) | ((df_analysis['连续涨停天数'] >= 2) &
-(df_analysis['涨跌幅'] > df_analysis['昨日竞价涨跌幅']) &
-(倍数>0.7) & (df_analysis['涨跌幅']<6) & (倍数<1)) | ((df_analysis['连续涨停天数'] >= 2) & (df_analysis['涨跌幅'] > df_analysis['昨日竞价涨跌幅']) &
-(倍数>2) & (df_analysis['涨跌幅']>9) & (df_analysis['昨日竞价涨跌幅']>4)) |        ((df_analysis['连续涨停天数'] >= 2) &
-(df_analysis['涨跌幅'] >2 df_analysis['昨日竞价涨跌幅']>9.8) & (倍数>15) & (df_analysis['涨跌幅']<6))
+        (倍数>0.7) & (df_analysis['涨跌幅']>9) & (倍数<1)) |
+        ((df_analysis['连续涨停天数'] >= 2) & (df_analysis['涨跌幅'] >9.8) & (df_analysis['昨日竞价涨跌幅']>9.8) & (倍数>3)) |
+        ((df_analysis['连续涨停天数'] >= 2) & (df_analysis['涨跌幅'] > df_analysis['昨日竞价涨跌幅']) & (倍数>0.7) & (df_analysis['涨跌幅']<6) & (倍数<1)) |
+        ((df_analysis['连续涨停天数'] >= 2) & (df_analysis['涨跌幅'] > df_analysis['昨日竞价涨跌幅']) &
+        (倍数>2) & (df_analysis['涨跌幅']>9) & (df_analysis['昨日竞价涨跌幅']>4)) |
+        ((df_analysis['连续涨停天数'] >= 2) &(df_analysis['涨跌幅'] >2) & (df_analysis['昨日竞价涨跌幅']>9.8) & (倍数>15) & (df_analysis['涨跌幅']<6))
     )
     
     df_filtered = df_analysis[condition].copy()
@@ -734,4 +735,3 @@ def bankuai_tab(selected_date=None, prev_date=None):
 if __name__ == "__main__":
     st.set_page_config(layout="wide")
     bankuai_tab()
-
