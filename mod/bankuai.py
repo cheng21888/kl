@@ -7,11 +7,11 @@ from collections import Counter, defaultdict
 import re
 import numpy as np
 from modules.config import SAVE_DIR
-from modules.data_loader import get_trade_dates, read_market_data
-from modules.analyzer import (
+from mod.data_loader import get_trade_dates, read_market_data
+from mod.analyzer import (
     analyze_auction_flow, calculate_hot_concepts, calculate_auto_concepts, build_zt_tags
 )
-from modules.reporter import (
+from mod.reporter import (
     report_overview, report_top_stocks, report_sector_flow, report_top_amount_stocks,
     report_hot_concepts, report_auto_concepts, report_zt_stocks
 )
@@ -317,6 +317,7 @@ def report_continuous_limit_up_acceleration(today_date: datetime, prev_date: dat
     
     # 获取昨日竞价数据（包含昨日竞价涨跌幅）
     df_yest_auction = read_market_data(prev_date, '竞价行情')
+    df_close = read_market_data(prev_date, '收盘行情')
     
     if df_limit.empty or df_yest_auction.empty:
         print("⚠️ 无法获取昨日涨跌停数据或昨日竞价数据")
@@ -341,9 +342,18 @@ def report_continuous_limit_up_acceleration(today_date: datetime, prev_date: dat
         on='股票代码',
         how='left'
     )
+
+    df_analysis = df_analysis.merge(
+        df_close[['股票代码', '涨跌幅', '振幅']].rename(
+            columns={'涨跌幅': '昨日收盘涨跌幅', '振幅': '昨日振幅'}
+        ),
+        on='股票代码',
+        how='left'
+    )
     
     # 填充缺失值
     df_analysis['昨日竞价涨跌幅'] = pd.to_numeric(df_analysis['昨日竞价涨跌幅'], errors='coerce').fillna(-100)
+    df_analysis['昨日振幅'] = pd.to_numeric(df_analysis['昨日振幅'], errors='coerce').fillna(0)
     df_analysis['昨日竞价成交额'] = pd.to_numeric(df_analysis['昨日竞价成交额'], errors='coerce').fillna(0)
     df_analysis['涨跌幅'] = pd.to_numeric(df_analysis['涨跌幅'], errors='coerce').fillna(0)
     df_analysis['竞价金额_今'] = pd.to_numeric(df_analysis['竞价金额_今'], errors='coerce').fillna(0)
@@ -362,7 +372,11 @@ def report_continuous_limit_up_acceleration(today_date: datetime, prev_date: dat
         ((df_analysis['连续涨停天数'] >= 2) & (df_analysis['涨跌幅'] >4) & (df_analysis['昨日竞价涨跌幅']>4) &
          (倍数>0.7) & (df_analysis['涨跌幅']<6) & (df_analysis['昨日竞价涨跌幅']<6) & (倍数<1)) |
         ((df_analysis['连续涨停天数'] >= 2) & (df_analysis['涨跌幅'] >4) & (df_analysis['昨日竞价涨跌幅']>0) &
-         (倍数>0.9) & (df_analysis['涨跌幅']<9) & (df_analysis['昨日竞价涨跌幅']<1) & (倍数<1.2))
+         (倍数>0.9) & (df_analysis['涨跌幅']<9) & (df_analysis['昨日竞价涨跌幅']<1) & (倍数<1.2)) |
+        ((df_analysis['涨跌幅'] <-5) & (df_analysis['昨日竞价涨跌幅']>-0.5) & (df_analysis['昨日收盘涨跌幅']>8) &
+         (倍数>2)) |
+        ((df_analysis['涨跌幅'] >0.5) & (df_analysis['昨日竞价涨跌幅']>2) & (df_analysis['昨日振幅']>7) & (df_analysis['昨日收盘涨跌幅']<7)&
+         (倍数>1) & (df_analysis['昨日振幅']<10))
     )
     
     df_filtered = df_analysis[condition].copy()
