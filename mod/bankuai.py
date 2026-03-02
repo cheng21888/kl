@@ -358,28 +358,32 @@ def report_continuous_limit_up_acceleration(today_date: datetime, prev_date: dat
     df_analysis['涨跌幅'] = pd.to_numeric(df_analysis['涨跌幅'], errors='coerce').fillna(0)
     df_analysis['竞价金额_今'] = pd.to_numeric(df_analysis['竞价金额_今'], errors='coerce').fillna(0)
     倍数=df_analysis['竞价金额_今'] / df_analysis['昨日竞价成交额']
-    大=df_analysis['今日竞价涨跌幅']> (df_analysis['昨日竞价涨跌幅']
+    大=df_analysis['涨跌幅']> df_analysis['昨日竞价涨跌幅']
+    昨 = (df_analysis['昨日竞价成交额'] / 1e8).round(4)
+    昨竞=df_analysis['昨日竞价涨跌幅'].round(2)
     # 应用筛选条件
     condition = (
         ((df_analysis['连续涨停天数'] >= 2) &
-        (df_analysis['涨跌幅'] > df_analysis['昨日竞价涨跌幅']) &
+        (df_analysis['涨跌幅'] > 昨竞) &
         (倍数>0.7) & (df_analysis['涨跌幅']>9) & (倍数<1)) |
-        ((df_analysis['连续涨停天数'] >= 2) & (df_analysis['涨跌幅'] >9.8) & (df_analysis['昨日竞价涨跌幅']>9.8) & (倍数>3)) |
-        ((df_analysis['连续涨停天数'] >= 2) & (df_analysis['涨跌幅'] > df_analysis['昨日竞价涨跌幅']) & (倍数>0.7) & (df_analysis['涨跌幅']<6) & (倍数<1)) |
-        ((df_analysis['连续涨停天数'] >= 2) & (df_analysis['涨跌幅'] > df_analysis['昨日竞价涨跌幅']) &
-        (倍数>2) & (df_analysis['涨跌幅']>9) & (df_analysis['昨日竞价涨跌幅']>4)) |
-        ((df_analysis['连续涨停天数'] >= 2) & (df_analysis['涨跌幅'] >2) & (df_analysis['昨日竞价涨跌幅']>9.8) &
+        ((df_analysis['连续涨停天数'] >= 2) & (df_analysis['涨跌幅'] >9.8) & (昨竞>9.8) & (倍数>3)) |
+        ((df_analysis['连续涨停天数'] >= 2) & (df_analysis['涨跌幅'] > 昨竞) & (倍数>0.7) & (df_analysis['涨跌幅']<6) & (倍数<1)) |
+        ((df_analysis['连续涨停天数'] >= 2) & (df_analysis['涨跌幅'] >昨竞) &
+        (倍数>2) & (df_analysis['涨跌幅']>9) & (昨竞>4)) |
+        ((df_analysis['连续涨停天数'] >= 2) & (df_analysis['涨跌幅'] >2) & (昨竞>9.8) &
          (倍数>15) & (df_analysis['涨跌幅']<6)) |
-        ((df_analysis['连续涨停天数'] >= 2) & (df_analysis['涨跌幅'] >4) & (df_analysis['昨日竞价涨跌幅']>4) &
-         (倍数>0.7) & (df_analysis['涨跌幅']<6) & (df_analysis['昨日竞价涨跌幅']<6) & (倍数<1)) |
-        ((df_analysis['连续涨停天数'] >= 2) & (df_analysis['涨跌幅'] >4) & (df_analysis['昨日竞价涨跌幅']>0) &
-         (倍数>0.9) & (df_analysis['涨跌幅']<9) & (df_analysis['昨日竞价涨跌幅']<1) & (倍数<1.2)) |
-        ((df_analysis['涨跌幅'] <-5) & (df_analysis['昨日竞价涨跌幅']>-0.5) & (df_analysis['昨日收盘涨跌幅']>8) &
+        ((df_analysis['连续涨停天数'] >= 2) & (df_analysis['涨跌幅'] >4) & (昨竞>4) &
+         (倍数>0.7) & (df_analysis['涨跌幅']<6) & (昨竞<6) & (倍数<1)) |
+        ((df_analysis['连续涨停天数'] >= 2) & (df_analysis['涨跌幅'] >4) & (昨竞>0) &
+         (倍数>0.9) & (df_analysis['涨跌幅']<9) & (昨竞<1) & (倍数<1.2)) |
+        ((df_analysis['涨跌幅'] <-5) & (昨竞>-0.5) & (df_analysis['昨日收盘涨跌幅']>8) &
          (倍数>2)) |
-        ((df_analysis['涨跌幅'] >0.5) & (df_analysis['昨日竞价涨跌幅']>2) & (df_analysis['昨日振幅']>7) & (df_analysis['昨日收盘涨跌幅']<7)) & (df_analysis['昨日收盘涨跌幅']>0) &
-         (倍数>1) & (df_analysis['昨日振幅']<10) |
-        ((df_analysis['涨跌幅'] >4) & (df_analysis['昨日竞价涨跌幅']>2) & (df_analysis['昨日收盘涨跌幅']>9.8 & 大 & 倍数>2)|
-        ((df_analysis['涨跌幅'] >6) & (df_analysis['昨日竞价涨跌幅']>2) & (df_analysis['昨日收盘涨跌幅']>9.8 & 大 & 倍数>5)) 
+        ((df_analysis['涨跌幅'] >2) & (昨竞>2) & (df_analysis['昨日振幅']>7) & (df_analysis['昨日收盘涨跌幅']<7) &
+        (df_analysis['昨日收盘涨跌幅']>0) &
+         (倍数>1) & (df_analysis['昨日振幅']<10)) |
+        ((df_analysis['涨跌幅'] >4) & (昨>0.2) & (昨竞>0) & (昨竞<4) & (df_analysis['昨日收盘涨跌幅']>9.8) & (大) & (倍数>2)) |
+        ((df_analysis['涨跌幅'] >6) & (昨>0.18) & (昨竞>2) & (df_analysis['昨日收盘涨跌幅']>9.8) & (大) & (倍数>5)) |
+        ((df_analysis['涨跌幅'] >2) & (昨>0.18) & (昨竞<-2) & (df_analysis['昨日收盘涨跌幅']<-5) & (倍数<0.7) & (倍数>0.2))
     )
     
     df_filtered = df_analysis[condition].copy()
