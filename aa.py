@@ -46,6 +46,7 @@ from mod.analyzer_market import (
 )
 from mod.main_markdown import render_auction_report_tab  # 引入新封装的函数
 from mod.bankuai import bankuai_tab
+from mod.ce import bank
 from mod.trend_analyzer import display_trend_analysis
 # UI 渲染页面 (分模块)
 from mod.ui_sentiment import render_sentiment_dashboard
@@ -88,6 +89,8 @@ if check_password():
 
         if st.button("📊 板块强度", use_container_width=True):
             st.session_state.active_page = "📊 板块强度"
+        if st.button("📊 板块", use_container_width=True):
+            st.session_state.active_page = "📊 板块"
 
         # 增加间距把控制中心压下去
         st.markdown("<br>" * 5, unsafe_allow_html=True)
@@ -138,3 +141,6 @@ if check_password():
     elif st.session_state.active_page == "📊 板块强度":
         # target_date 是你侧边栏 date_input 选中的日期
         bankuai_tab(target_date)
+    elif st.session_state.active_page == "📊 板块":
+        # target_date 是你侧边栏 date_input 选中的日期
+        bank(target_date)
