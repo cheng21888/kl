@@ -124,41 +124,6 @@ def report_9pct_stocks(today_date: datetime, prev_date: datetime, df_9pct: pd.Da
     return df_9pct  # 返回数据
 
 
-# ---------------------- 竞价涨幅＞7%分析函数 ----------------------
-def report_7pct_stocks(today_date: datetime, prev_date: datetime, df_7pct: pd.DataFrame) -> pd.DataFrame:
-    """ 输出竞价涨幅＞7%个股分析报告（适配无封单额、按竞价金额排序，与9%逻辑完全对齐） """
-    print(f"\n# 📊 竞价涨幅＞7%个股分析 ({today_date.strftime('%Y-%m-%d')})")
-
-    # 1. 核心统计汇总（同9%格式，区分20CM）
-    p7_count = len(df_7pct)
-    cm20_count = len(df_7pct[df_7pct['涨跌幅'] > 19]) if '涨跌幅' in df_7pct.columns else 0
-
-    print(f"\n**今日竞价涨幅＞7%总数**: {p7_count} 只 (其中 20CM: {cm20_count} 只)")
-
-    # 2. 竞价金额统计（与9%、report_top_amount_stocks保持单位/精度一致）
-    if '竞价金额_今' in df_7pct.columns:
-        avg_amt = (df_7pct['竞价金额_今'].mean() / 1e8).round(4)
-        max_amt = (df_7pct['竞价金额_今'].max() / 1e8).round(4)
-        print(f"**竞价金额统计**: 平均 {avg_amt} 亿 | 最高 {max_amt} 亿")
-
-    # 3. 详情表处理（按竞价金额降序，单位转换+保留4位小数，同9%逻辑）
-    df_display = df_7pct.copy()
-    if '竞价金额_今' in df_display.columns:
-        df_display = df_display.sort_values('竞价金额_今', ascending=False)
-        df_display['竞价金额(亿)'] = (df_display['竞价金额_今'] / 1e8).round(4)
-
-    # 定义展示列（与9%完全一致，自动过滤不存在的列，兼容数据结构）
-    show_cols = ['股票简称', '涨跌幅', '竞价金额(亿)', '增量(亿)', '所属行业', '流通市值(亿)', '结构标签', '热点标签']
-    final_show = [c for c in show_cols if c in df_display.columns]
-
-    # 输出markdown表格（复用现有工具，与9%、涨停报告格式统一）
-    print(pd.DataFrame(df_display[final_show]).to_markdown(index=False))
-
-    # 4. 在表格下方单独分析本表格的关键词
-    analyze_single_table_keywords(df_7pct, "竞价涨幅＞7%", top_n=5)
-
-    return df_7pct  # 返回数据
-
 
 # ---------------------- 新增：连板加速筛选分析函数 ----------------------
 def report_continuous_limit_up_acceleration(today_date: datetime, prev_date: datetime, df: pd.DataFrame) -> pd.DataFrame:
@@ -397,8 +362,6 @@ def get_auction_analysis_data(today_date, prev_date):
 
     # 筛选竞价涨幅＞9%个股数据
     df_9pct = df[df['涨跌幅'] > 9].copy()
-    # 筛选竞价涨幅＞7%个股数据
-    df_7pct = df[df['涨跌幅'] > 7].copy()
 
     # 2. 计算其他题材数据
     total_abs = df['增量(亿)'].abs().sum()
@@ -410,7 +373,6 @@ def get_auction_analysis_data(today_date, prev_date):
     with contextlib.redirect_stdout(output_buffer):
         report_overview(today_date, prev_date, overview)
         # 调用报告函数（内部已包含关键词分析）
-        df_7pct_data = report_7pct_stocks(today_date, prev_date, df_7pct)
         df_9pct_data = report_9pct_stocks(today_date, prev_date, df_9pct)
 
         # 新增：连板加速筛选分析
@@ -426,7 +388,6 @@ def get_auction_analysis_data(today_date, prev_date):
         "md_report": report_md_content,
         "df_zt": df_zt,
         "df_9pct": df_9pct,
-        "df_7pct": df_7pct,
         "df_acceleration": df_acceleration  # 新增
     }
 
