@@ -160,142 +160,6 @@ def report_7pct_stocks(today_date: datetime, prev_date: datetime, df_7pct: pd.Da
     return df_7pct  # 返回数据
 
 
-# ---------------------- 新增：特殊条件筛选分析函数 ----------------------
-def report_special_conditions(today_date: datetime, prev_date: datetime, df: pd.DataFrame) -> pd.DataFrame:
-    """
-    筛选满足特定条件的股票并生成表格
-    条件：
-    1. 连续涨停天数 >= 2，竞价放量倍数 >= 1，今日竞价涨幅 > 昨日收盘涨跌幅
-    2. 或者：昨日收盘涨跌幅在 -9.8% 到 -5% 之间，且今日竞价成交额 > 昨日竞价成交额
-    """
-    print(f"\n# 🎯 特殊条件筛选分析 ({today_date.strftime('%Y-%m-%d')})")
-    
-    if df is None or df.empty:
-        print("⚠️ 无有效数据")
-        return pd.DataFrame()
-    
-    # 获取昨日收盘数据
-    df_close = read_market_data(prev_date, '收盘行情')
-    df_yest_auction = read_market_data(prev_date, '竞价行情')
-    
-    if df_close.empty or df_yest_auction.empty:
-        print("⚠️ 无法获取昨日收盘数据或昨日竞价数据")
-        return pd.DataFrame()
-    
-    # 准备数据
-    df_analysis = df.copy()
-    
-    # 合并昨日收盘数据
-    df_analysis = df_analysis.merge(
-        df_close[['股票代码', '涨跌幅']].rename(columns={'涨跌幅': '昨日收盘涨跌幅'}),
-        on='股票代码',
-        how='left'
-    )
-    
-    # 合并昨日竞价数据（用于成交额对比）
-    df_analysis = df_analysis.merge(
-        df_yest_auction[['股票代码', '竞价金额']].rename(columns={'竞价金额': '昨日竞价成交额'}),
-        on='股票代码',
-        how='left'
-    )
-    
-    # 填充缺失值前确保列存在
-    required_cols = {
-        '昨日收盘涨跌幅': 0,
-        '昨日竞价成交额': 1e6,
-        '竞价金额_今': 0,
-        '涨跌幅': 0
-    }
-    
-    for col, default_val in required_cols.items():
-        if col in df_analysis.columns:
-            df_analysis[col] = pd.to_numeric(df_analysis[col], errors='coerce').fillna(default_val)
-        else:
-            df_analysis[col] = default_val
-    
-    # 条件2：大跌后竞价放量
-    cond2 = (
-        (df_analysis['昨日收盘涨跌幅'] > -9.8) &
-        (df_analysis['昨日收盘涨跌幅'] < -5) &
-        (df_analysis['竞价金额_今'] > df_analysis['昨日竞价成交额'])
-    )
-    
-    df_filtered = df_analysis[cond2].copy()
-    
-    if df_filtered.empty:
-        print("⚠️ 没有股票满足筛选条件")
-        return pd.DataFrame()
-    
-    # 统计信息
-    total_count = len(df_filtered)
-    cond2_count = len(df_analysis[cond2])
-    
-    print(f"\n**满足条件总数**: {total_count} 只")
-    print(f"- 条件2(大跌后竞价放量): {cond2_count} 只")
-    
-    # 竞价金额统计
-    if '竞价金额_今' in df_filtered.columns:
-        avg_amt = (df_filtered['竞价金额_今'].mean() / 1e8).round(4)
-        max_amt = (df_filtered['竞价金额_今'].max() / 1e8).round(4)
-        print(f"\n**竞价金额统计**: 平均 {avg_amt} 亿 | 最高 {max_amt} 亿")
-    
-    # 按条件分类并排序
-    df_filtered['筛选条件'] = '其他'
-    
-    # 正确索引条件
-    cond2_indices = df_filtered.index[cond2[df_filtered.index]]
-    
-    df_filtered.loc[cond2_indices, '筛选条件'] = '大跌后竞价放量'
-    
-    # 按竞价金额降序排序
-    df_filtered = df_filtered.sort_values('竞价金额_今', ascending=False)
-    
-    # 准备展示数据
-    df_display = df_filtered.copy()
-    
-    # 转换金额单位为亿
-    if '竞价金额_今' in df_display.columns:
-        df_display['竞价金额(亿)'] = (df_display['竞价金额_今'] / 1e8).round(4)
-    
-    if '昨日竞价成交额' in df_display.columns:
-        df_display['昨日竞价(亿)'] = (df_display['昨日竞价成交额'] / 1e8).round(4)
-    
-    # 格式化涨跌幅显示
-    df_display['涨跌幅%'] = df_display['涨跌幅'].round(2)
-    df_display['昨日收盘%'] = df_display['昨日收盘涨跌幅'].round(2)
-    
-    # 定义展示列
-    show_cols = [
-        '股票简称', '筛选条件', '涨跌幅%', '昨日收盘%', 
-        '竞价金额(亿)', '昨日竞价(亿)', '所属行业', '流通市值(亿)', 
-        '结构标签', '热点标签'
-    ]
-    final_show = [c for c in show_cols if c in df_display.columns]
-    
-    # 输出markdown表格
-    print("\n### 📋 筛选结果详情")
-    if final_show:
-        print(pd.DataFrame(df_display[final_show]).to_markdown(index=False))
-    else:
-        print("⚠️ 没有可显示的列")
-    
-    # 按条件分组统计
-    if '筛选条件' in df_filtered.columns and len(df_filtered['筛选条件'].unique()) > 0:
-        print("\n### 📊 按条件分组统计")
-        group_stats = df_filtered.groupby('筛选条件').agg({
-            '股票代码': 'count',
-            '竞价金额_今': lambda x: (x.sum() / 1e8).round(2) if x.sum() > 0 else 0,
-            '涨跌幅': 'mean'
-        }).round(2)
-        group_stats.columns = ['股票数量', '总竞价金额(亿)', '平均涨幅%']
-        print(group_stats.to_markdown())
-    
-    # 分析行业关键词
-    analyze_single_table_keywords(df_filtered, "特殊条件筛选", top_n=5)
-    
-    return df_filtered
-
-
 # ---------------------- 新增：连板加速筛选分析函数 ----------------------
 def report_continuous_limit_up_acceleration(today_date: datetime, prev_date: datetime, df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -548,8 +412,7 @@ def get_auction_analysis_data(today_date, prev_date):
         # 调用报告函数（内部已包含关键词分析）
         df_7pct_data = report_7pct_stocks(today_date, prev_date, df_7pct)
         df_9pct_data = report_9pct_stocks(today_date, prev_date, df_9pct)
-        # 新增：特殊条件筛选分析
-        df_special = report_special_conditions(today_date, prev_date, df)
+
         # 新增：连板加速筛选分析
         df_acceleration = report_continuous_limit_up_acceleration(today_date, prev_date, df)
 
@@ -564,7 +427,6 @@ def get_auction_analysis_data(today_date, prev_date):
         "df_zt": df_zt,
         "df_9pct": df_9pct,
         "df_7pct": df_7pct,
-        "df_special": df_special,
         "df_acceleration": df_acceleration  # 新增
     }
 
@@ -624,59 +486,7 @@ def bankuai_tab(selected_date=None, prev_date=None):
             st.subheader("🔥 热门题材统计")
             st.dataframe(data["hot_stats"], use_container_width=True)
 
-        with tab_special:
-            st.subheader("🎯 特殊条件筛选结果")
-            if "df_special" in data and data["df_special"] is not None and not data["df_special"].empty:
-                df_special_display = data["df_special"].copy()
-                
-                # 准备展示数据
-                if '竞价金额_今' in df_special_display.columns:
-                    df_special_display['竞价金额(亿)'] = (df_special_display['竞价金额_今'] / 1e8).round(4)
-                
-                if '昨日竞价成交额' in df_special_display.columns:
-                    df_special_display['昨日竞价(亿)'] = (df_special_display['昨日竞价成交额'] / 1e8).round(4)
-                
-                # 格式化涨跌幅
-                if '涨跌幅' in df_special_display.columns:
-                    df_special_display['涨跌幅%'] = df_special_display['涨跌幅'].round(2)
-                
-                if '昨日收盘涨跌幅' in df_special_display.columns:
-                    df_special_display['昨日收盘%'] = df_special_display['昨日收盘涨跌幅'].round(2)
-                
-                # 选择要显示的列
-                display_cols = [
-                    '股票简称', '筛选条件', '涨跌幅%', '昨日收盘%',
-                    '竞价金额(亿)', '昨日竞价(亿)', '所属行业', '结构标签'
-                ]
-                display_cols = [c for c in display_cols if c in df_special_display.columns]
-                
-                st.dataframe(df_special_display[display_cols], use_container_width=True)
-                
-                # 显示统计信息
-                st.subheader("📊 统计摘要")
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("满足条件总数", len(df_special_display))
-                with col2:
-                    cond1_count = len(df_special_display[df_special_display['筛选条件'] == '连板放量高开'])
-                    st.metric("连板放量高开", cond1_count)
-                with col3:
-                    cond2_count = len(df_special_display[df_special_display['筛选条件'] == '大跌后竞价放量'])
-                    st.metric("大跌后竞价放量", cond2_count)
-                
-                # 分组统计
-                if '筛选条件' in df_special_display.columns:
-                    st.subheader("📈 分组统计")
-                    group_stats = df_special_display.groupby('筛选条件').agg({
-                        '股票简称': 'count',
-                        '竞价金额(亿)': 'sum',
-                        '涨跌幅%': 'mean'
-                    }).round(2)
-                    group_stats.columns = ['股票数量', '总竞价金额(亿)', '平均涨幅%']
-                    st.dataframe(group_stats, use_container_width=True)
-            else:
-                st.info("ℹ️ 没有股票满足筛选条件")
-
+        
         with tab_acceleration:
             st.subheader("🚀 连板加速筛选结果")
             if "df_acceleration" in data and data["df_acceleration"] is not None and not data["df_acceleration"].empty:
