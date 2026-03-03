@@ -191,6 +191,8 @@ def report_continuous_limit_up_acceleration(today_date: datetime, prev_date: dat
     昨成 = (df_analysis['昨日竞价成交额'] / 1e8).round(4)
     昨竞=df_analysis['昨日竞价涨跌幅'].round(2)
     昨收=df_analysis['昨日收盘涨跌幅'].round(2)
+    今=df_analysis['涨跌幅'].round(2)
+    连=df_analysis['连续涨停天数']
     # 应用筛选条件
     condition = (
         ((df_analysis['连续涨停天数'] >= 2) &
@@ -213,7 +215,10 @@ def report_continuous_limit_up_acceleration(today_date: datetime, prev_date: dat
         ((df_analysis['涨跌幅'] >4) & (昨成>0.2) & (昨竞>2) & (昨竞<5) & (昨收>9.8) & (大) & (倍数>2)) |  #汉缆股份
         ((df_analysis['涨跌幅'] >6) & (昨成>0.18) & (昨竞>2) & (昨收>9.8) & (大) & (倍数>5)) |
         ((df_analysis['涨跌幅'] >2) & (昨成>0.18) & (昨竞<-2) & (昨收<-5) & (倍数<0.7) & (倍数>0.2)) | #风语筑
-        ((df_analysis['涨跌幅'] > 4) & (昨成< 0.08) & (昨竞 < 1) & (昨竞 >-0.5) & (昨收>9.8) & (倍数 > 15))  # 水发燃气
+        ((df_analysis['涨跌幅'] > 4) & (昨成< 0.08) & (昨竞 < 1) & (昨竞 >-0.5) & (昨收>9.8) & (倍数 > 15)) | # 水发燃气
+        ((今>5) & (昨竞<-2) & (连>1) & (倍数>2) & (昨成>1) & (倍数<3) & (昨收>9.8)) |  #烽火通信
+        ((昨竞>9.8) & (今>5) & (昨成>0.5) & (倍数>1) & (倍数<2)) | #泰嘉股份
+        ((昨竞<-2) & (连) & (今>5) & (倍<3) & (倍数>2) & (昨成>1)) |   #赫美集团
     )
     
     df_filtered = df_analysis[condition].copy()
