@@ -375,7 +375,7 @@ def get_auction_analysis_data(today_date, prev_date):
 
 
 # --- 第二部分：只负责界面渲染 (去掉缓存装饰器) ---
-def bankuai_tab(selected_date=None, prev_date=None):
+def bank(selected_date=None, prev_date=None):
     """
     不带缓存，每次运行都会执行，保证按钮和 UI 正常显示
     """
@@ -515,3 +515,4 @@ def bankuai_tab(selected_date=None, prev_date=None):
 if __name__ == "__main__":
     st.set_page_config(layout="wide")
     bankuai_tab()
+
